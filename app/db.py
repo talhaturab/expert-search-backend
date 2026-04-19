@@ -95,13 +95,20 @@ def fetch_candidate_bundle(dsn: str, candidate_id: str) -> dict:
             }
 
 
-def fetch_all_bundles(dsn: str) -> list[dict]:
-    """All 10k candidates with full bundles. Used by the offline indexer.
+def fetch_all_bundles(dsn: str, limit: int | None = None) -> list[dict]:
+    """All (or first N) candidates with full bundles. Used by the offline indexer.
 
     Streams one connection; N+1 queries per candidate but runs once offline.
-    Total ~50k queries over a persistent connection: ~1-2 minutes.
+    Total ~50k queries over a persistent connection for the full 10K set.
+
+    Args:
+        dsn: Postgres connection string.
+        limit: Optional cap on number of candidates to load. None = all.
     """
     candidates = fetch_all_candidates(dsn)
+    if limit is not None:
+        candidates = candidates[:limit]
+
     results: list[dict] = []
     with psycopg2.connect(dsn) as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:

@@ -15,12 +15,17 @@ def build_index(
     embedding_model: str,
     store: ChromaStore,
     batch_size: int = 64,
+    limit: int | None = None,
 ) -> dict:
-    """Build the Chroma index. Returns a summary dict."""
+    """Build the Chroma index. Returns a summary dict.
+
+    Args:
+        limit: Optional cap on candidates to ingest. None = ingest all 10k.
+    """
     t0 = time.monotonic()
     store.reset()
 
-    bundles = fetch_all_bundles(dsn)
+    bundles = fetch_all_bundles(dsn, limit=limit)
     embedder = EmbeddingClient(api_key=api_key, model=embedding_model)
 
     # Stage all (text, id, metadata) triples
