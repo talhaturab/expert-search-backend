@@ -3,7 +3,7 @@ from pydantic import ValidationError
 
 from app.models import (
     DimensionSpec, GeoSpec, SenioritySpec, SkillsSpec, LanguagesSpec,
-    ParsedSpec, CandidateResult, ChatRequest, ChatResponse,
+    ParsedSpec, ViewWeights, CandidateResult, ChatRequest, ChatResponse,
     IngestRequest, HealthResponse,
 )
 
@@ -24,10 +24,11 @@ def test_parsed_spec_full():
                           location_type="current_or_nationality"),
         seniority=SenioritySpec(levels=["senior"], weight=0.10, required=False),
         temporality="any",
-        view_weights={"summary": 0.3, "work": 0.5, "skills_edu": 0.2},
+        view_weights=ViewWeights(summary=0.3, work=0.5, skills_edu=0.2),
     )
     assert spec.function.values == ["Regulatory Affairs"]
     assert spec.geography.location_type == "current_or_nationality"
+    assert spec.view_weights.work == 0.5
 
 
 def test_parsed_spec_invalid_temporality():

@@ -36,6 +36,14 @@ class LanguagesSpec(BaseModel):
 ViewName = Literal["summary", "work", "skills_edu"]
 
 
+class ViewWeights(BaseModel):
+    """Per-view aggregation weights for RAG. Avoid `dict[Literal, float]` because
+    it emits `propertyNames` in JSON Schema, which Anthropic's validator rejects."""
+    summary: float = 0.0
+    work: float = 0.0
+    skills_edu: float = 0.0
+
+
 class ParsedSpec(BaseModel):
     function: DimensionSpec | None = None
     industry: DimensionSpec | None = None
@@ -45,7 +53,7 @@ class ParsedSpec(BaseModel):
     languages: LanguagesSpec | None = None
     min_years_exp: int | None = None
     temporality: Literal["current", "past", "any"] = "any"
-    view_weights: dict[ViewName, float] | None = None
+    view_weights: ViewWeights | None = None
 
 
 # ---------- Result structures ----------
