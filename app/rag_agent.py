@@ -1,10 +1,17 @@
-"""RAG agent — full-scan hybrid retrieval (vector + BM25) with RRF fusion."""
+"""RAG agent — full-scan hybrid retrieval (vector + BM25) with RRF fusion + parallel pointwise rerank."""
 from __future__ import annotations
+
+import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 
 from app.bm25_index import BM25Index
-from app.models import ViewWeights
+from app.llm import LLMClient
+from app.models import CandidateResult, RerankPick, ViewWeights
+
+
+log = logging.getLogger(__name__)
 
 
 VIEW_ORDER: tuple[str, str, str] = ("summary", "work", "skills_edu")
@@ -102,3 +109,89 @@ def retrieve_candidates(
             "bm25_per_view": {VIEW_ORDER[v]: float(bm25_mat[idx, v]) for v in range(3)},
         })
     return results
+
+
+# ---------------------------------------------------------------------------
+# Pointwise parallel rerank
+# ---------------------------------------------------------------------------
+
+RERANK_SYSTEM_PROMPT = """You are scoring a single candidate's fit for a search query.
+
+Return a strict JSON object with:
+- score: integer 0-100 (100 = perfect, 50 = partial, 0 = off-topic)
+- match_explanation: ONE concise sentence on why this score
+- highlights: 2-4 concrete bullet-style proof-points pulled from the profile
+  (each bullet should be a specific fact — e.g. "12y at Pfizer", "based in Dubai",
+  NOT "strong experience")
+
+Be strict with scoring. If the candidate only weakly matches one dimension, cap at 40.
+If they match every dimension concretely, 80+ is appropriate."""
+
+
+def _format_candidate_prompt(query: str, candidate: dict) -> list[dict]:
+    docs = candidate["documents"]
+    user = (
+        f"Query: {query}\n\n"
+        f"Candidate [candidate_id: {candidate['candidate_id']}]:\n"
+        f"Summary:    {docs['summary']}\n"
+        f"Work:       {docs['work']}\n"
+        f"Skills/Edu: {docs['skills_edu']}\n\n"
+        "Score this candidate now."
+    )
+    return [
+        {"role": "system", "content": RERANK_SYSTEM_PROMPT},
+        {"role": "user",   "content": user},
+    ]
+
+
+def _score_one(query: str, candidate: dict, llm: LLMClient) -> tuple[dict, RerankPick]:
+    """Single-candidate LLM call. Returns (candidate, pick) or raises."""
+    messages = _format_candidate_prompt(query, candidate)
+    pick = llm.chat_structured(
+        messages=messages,
+        response_model=RerankPick,
+        temperature=0.0,
+        max_tokens=400,
+    )
+    # Clamp score to [0, 100] — we can't enforce it in JSON Schema on Anthropic.
+    pick.score = max(0, min(100, pick.score))
+    return candidate, pick
+
+
+def rerank_and_explain(
+    query: str,
+    candidates: list[dict],
+    llm: LLMClient,
+    top_k: int = 5,
+    max_workers: int = 16,
+) -> list[CandidateResult]:
+    """Pointwise parallel rerank.
+
+    One LLM call per candidate, fanned out in a ThreadPoolExecutor. Failures
+    on individual candidates are logged and skipped — we still return top_k
+    from the surviving scored set.
+    """
+    scored: list[tuple[dict, RerankPick]] = []
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(_score_one, query, c, llm): c for c in candidates}
+        for fut in as_completed(futures):
+            try:
+                scored.append(fut.result())
+            except Exception as e:
+                failed = futures[fut]
+                log.warning("Rerank failed for candidate %s: %s",
+                            failed.get("candidate_id", "?"), e)
+
+    # Sort by LLM score (desc), then by original retrieval score for tie-break
+    scored.sort(key=lambda t: (-t[1].score, -t[0].get("score", 0.0)))
+
+    out: list[CandidateResult] = []
+    for rank, (cand, pick) in enumerate(scored[:top_k], start=1):
+        out.append(CandidateResult(
+            candidate_id=str(cand["candidate_id"]),
+            rank=rank,
+            score=float(pick.score),
+            match_explanation=pick.match_explanation,
+            highlights=list(pick.highlights),
+        ))
+    return out

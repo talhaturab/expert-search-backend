@@ -1,7 +1,9 @@
+from unittest.mock import MagicMock
+
 import numpy as np
 
-from app.rag_agent import aggregate_per_candidate, retrieve_candidates, rrf_fuse
-from app.models import ViewWeights
+from app.rag_agent import aggregate_per_candidate, rerank_and_explain, retrieve_candidates, rrf_fuse
+from app.models import RerankPick, ViewWeights
 
 
 def test_aggregate_weighted_sum_when_view_weights_present():
@@ -68,3 +70,65 @@ def test_retrieve_candidates_returns_top_k():
     assert "rank" in results[0]
     assert "documents" in results[0]
     assert set(results[0]["documents"].keys()) == {"summary", "work", "skills_edu"}
+
+
+def test_rerank_and_explain_calls_llm_once_per_candidate_and_returns_top_5():
+    # Build 6 fake candidates; LLM returns different scores; expect top 5 sorted desc.
+    candidates = [
+        {"candidate_id": f"c{i}", "score": 0.01 * i, "rank": i + 1,
+         "documents": {"summary": f"sum{i}", "work": f"work{i}", "skills_edu": f"se{i}"}}
+        for i in range(6)
+    ]
+    # c0 -> score 10, c1 -> 20, c2 -> 90, c3 -> 50, c4 -> 80, c5 -> 40
+    score_map = {"c0": 10, "c1": 20, "c2": 90, "c3": 50, "c4": 80, "c5": 40}
+
+    def fake_chat_structured(messages, response_model, **kw):
+        assert response_model is RerankPick
+        # Extract the candidate_id from the prompt (trivial parsing for the test)
+        text = messages[-1]["content"]
+        for cid in score_map:
+            if f"candidate_id: {cid}" in text:
+                return RerankPick(
+                    score=score_map[cid],
+                    match_explanation=f"{cid} explanation",
+                    highlights=[f"{cid} hl"],
+                )
+        raise AssertionError("no candidate_id in prompt")
+
+    llm = MagicMock()
+    llm.chat_structured.side_effect = fake_chat_structured
+
+    picks = rerank_and_explain(query="find X", candidates=candidates, llm=llm, top_k=5)
+
+    assert len(picks) == 5
+    # Sorted by LLM score descending
+    assert [p.candidate_id for p in picks] == ["c2", "c4", "c3", "c5", "c1"]
+    assert [p.rank for p in picks] == [1, 2, 3, 4, 5]
+    assert picks[0].score == 90
+    assert picks[0].match_explanation == "c2 explanation"
+    # Called once per input candidate (6 calls)
+    assert llm.chat_structured.call_count == 6
+
+
+def test_rerank_and_explain_tolerates_single_failure():
+    # One call raises; the others still return; we still produce top-K from the survivors.
+    candidates = [
+        {"candidate_id": f"c{i}", "score": 0.0, "rank": i + 1,
+         "documents": {"summary": f"s{i}", "work": f"w{i}", "skills_edu": f"e{i}"}}
+        for i in range(3)
+    ]
+
+    def side(messages, response_model, **kw):
+        text = messages[-1]["content"]
+        if "candidate_id: c1" in text:
+            raise RuntimeError("boom")
+        return RerankPick(score=42, match_explanation="ok", highlights=["h"])
+
+    llm = MagicMock()
+    llm.chat_structured.side_effect = side
+
+    picks = rerank_and_explain(query="q", candidates=candidates, llm=llm, top_k=5)
+    # 2 survivors -> 2 picks returned
+    assert len(picks) == 2
+    ids = {p.candidate_id for p in picks}
+    assert ids == {"c0", "c2"}

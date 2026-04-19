@@ -67,6 +67,19 @@ class CandidateResult(BaseModel):
     per_dim: dict[str, float] | None = None  # populated only for det_picks
 
 
+class RerankPick(BaseModel):
+    """Structured LLM output for a single-candidate pointwise rerank call.
+
+    Note: `score` is intended to be 0-100 but we don't express ge/le as JSON
+    Schema constraints — Anthropic rejects `minimum`/`maximum` on `integer`.
+    We clamp in code after parsing instead.
+    """
+    score: int = Field(description="0-100 fit score (100=perfect, 0=off-topic)")
+    match_explanation: str = Field(description="One sentence on why this score")
+    highlights: list[str] = Field(default_factory=list,
+                                  description="2-4 concrete proof-points from the profile")
+
+
 # ---------- Request / Response models ----------
 
 class ChatRequest(BaseModel):
