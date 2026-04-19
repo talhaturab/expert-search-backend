@@ -29,3 +29,8 @@ pytest = "^9.0.3"
 pytest-asyncio = "^1.3.0"
 httpx = "^0.28.1"
 
+[tool.pytest.ini_options]
+markers = [
+    "integration: tests that hit real external services (DB, LLM APIs)",
+]
+
