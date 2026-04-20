@@ -1,0 +1,67 @@
+<svg viewBox="0 0 960 300" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, -apple-system, sans-serif">
+  <style>
+    .box { fill: #f5f7fb; stroke: #1f3a68; stroke-width: 1.5; }
+    .view { fill: #fff9e6; stroke: #c7740b; stroke-width: 1.5; }
+    .title { font-size: 13px; font-weight: 600; fill: #1b1b1b; }
+    .sub { font-size: 10px; fill: #444; }
+    .arrow { fill: none; stroke: #1f3a68; stroke-width: 1.5; marker-end: url(#arr5); }
+    .quote { font-size: 9.5px; fill: #5a5a5a; font-style: italic; }
+  </style>
+  <defs>
+    <marker id="arr5" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1f3a68"/>
+    </marker>
+  </defs>
+
+  <text x="480" y="24" text-anchor="middle" font-size="16" font-weight="700">Three Probe-Text Views per Candidate</text>
+  <text x="480" y="44" text-anchor="middle" class="sub">one candidate → three synthesised natural-language passages → three embeddings</text>
+
+  <!-- Candidate box -->
+  <rect x="40" y="100" width="180" height="120" rx="8" class="box"/>
+  <text x="130" y="124" text-anchor="middle" class="title">Sara Ali</text>
+  <text x="130" y="140" text-anchor="middle" class="sub">16 y exp · Philadelphia, US</text>
+  <text x="130" y="154" text-anchor="middle" class="sub">Nationality: Latvia</text>
+  <text x="130" y="172" text-anchor="middle" class="sub">1 work · 1 edu · 2 skills</text>
+  <text x="130" y="188" text-anchor="middle" class="sub">1 language</text>
+  <text x="130" y="208" text-anchor="middle" class="sub" font-weight="600">raw DB record</text>
+
+  <!-- 3 views -->
+  <rect x="340" y="60" width="320" height="60" rx="8" class="view"/>
+  <text x="350" y="78" class="title">summary</text>
+  <text x="350" y="94" class="quote">"Sara Ali is a professional with 16 years of</text>
+  <text x="350" y="106" class="quote">experience. Currently Engineering Manager at IDM…"</text>
+
+  <rect x="340" y="135" width="320" height="60" rx="8" class="view"/>
+  <text x="350" y="153" class="title">work</text>
+  <text x="350" y="169" class="quote">"Sara's career includes: Engineering Manager Research</text>
+  <text x="350" y="181" class="quote">Scientist at IDM Brokerage (Finance, Czech Republic)…"</text>
+
+  <rect x="340" y="210" width="320" height="60" rx="8" class="view"/>
+  <text x="350" y="228" class="title">skills_edu</text>
+  <text x="350" y="244" class="quote">"Sara's top skills: Brand Marketing (9y, Expert),</text>
+  <text x="350" y="256" class="quote">Analysis (6y, Expert). Education: Associate's in…"</text>
+
+  <!-- Arrows from candidate to views -->
+  <path class="arrow" d="M220 140 L340 90"/>
+  <path class="arrow" d="M220 160 L340 165"/>
+  <path class="arrow" d="M220 180 L340 240"/>
+
+  <!-- Embedding column -->
+  <rect x="720" y="60" width="180" height="60" rx="8" class="box"/>
+  <text x="810" y="82" text-anchor="middle" class="title">vec(summary)</text>
+  <text x="810" y="98" text-anchor="middle" class="sub">1536-d · cosine-compared</text>
+  <text x="810" y="110" text-anchor="middle" class="sub">to query embedding</text>
+
+  <rect x="720" y="135" width="180" height="60" rx="8" class="box"/>
+  <text x="810" y="157" text-anchor="middle" class="title">vec(work)</text>
+  <text x="810" y="173" text-anchor="middle" class="sub">work-history signal</text>
+
+  <rect x="720" y="210" width="180" height="60" rx="8" class="box"/>
+  <text x="810" y="232" text-anchor="middle" class="title">vec(skills_edu)</text>
+  <text x="810" y="248" text-anchor="middle" class="sub">skills + education signal</text>
+
+  <!-- Arrows views → embeddings -->
+  <path class="arrow" d="M660 90 L718 90"/>
+  <path class="arrow" d="M660 165 L718 165"/>
+  <path class="arrow" d="M660 240 L718 240"/>
+</svg>

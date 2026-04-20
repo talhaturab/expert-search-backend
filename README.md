@@ -102,6 +102,7 @@ Returns:
 
 ## Design summary
 
+- **📖 Demo guide** (architecture + SVG diagrams + reasoning for every design choice): [`docs/DEMO_GUIDE.md`](docs/DEMO_GUIDE.md) — start here
 - Approved design spec: [`docs/superpowers/specs/2026-04-20-expert-search-design.md`](docs/superpowers/specs/2026-04-20-expert-search-design.md)
 - Conversation-context addition: [`docs/superpowers/specs/2026-04-21-conversation-context-design.md`](docs/superpowers/specs/2026-04-21-conversation-context-design.md)
 - **Part 3 — Evaluation & Precision Thinking** (brief's written deliverable): [`docs/PART_3_EVALUATION.md`](docs/PART_3_EVALUATION.md)

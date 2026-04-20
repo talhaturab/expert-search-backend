@@ -1,0 +1,105 @@
+<svg viewBox="0 0 960 420" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, -apple-system, sans-serif">
+  <style>
+    .box { fill: #f5f7fb; stroke: #1f3a68; stroke-width: 1.5; }
+    .dim { fill: #eef5ec; stroke: #2a7d4d; stroke-width: 1.5; }
+    .out { fill: #fceef0; stroke: #a63446; stroke-width: 1.5; }
+    .title { font-size: 13px; font-weight: 600; fill: #1b1b1b; }
+    .sub { font-size: 11px; fill: #444; }
+    .arrow { fill: none; stroke: #1f3a68; stroke-width: 1.5; marker-end: url(#arr4); }
+    .mono { font-family: ui-monospace, "SF Mono", monospace; font-size: 10px; fill: #444; }
+  </style>
+  <defs>
+    <marker id="arr4" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1f3a68"/>
+    </marker>
+  </defs>
+
+  <text x="480" y="24" text-anchor="middle" font-size="16" font-weight="700">Deterministic Agent — SQL-driven scoring (no LLM)</text>
+
+  <!-- Input -->
+  <rect x="20" y="70" width="140" height="60" rx="8" class="box"/>
+  <text x="90" y="92" text-anchor="middle" class="title">Input</text>
+  <text x="90" y="108" text-anchor="middle" class="sub">ParsedSpec +</text>
+  <text x="90" y="120" text-anchor="middle" class="sub">10 120 bundles</text>
+
+  <!-- Hard filter -->
+  <rect x="190" y="70" width="160" height="60" rx="8" class="box"/>
+  <text x="270" y="90" text-anchor="middle" class="title">Hard Filter</text>
+  <text x="270" y="106" text-anchor="middle" class="sub">required=True dims</text>
+  <text x="270" y="120" text-anchor="middle" class="sub">threshold ≥ 0.30</text>
+
+  <!-- 6 scoring dims -->
+  <rect x="390" y="40" width="140" height="36" rx="6" class="dim"/>
+  <text x="460" y="58" text-anchor="middle" class="title">Function</text>
+  <text x="460" y="70" text-anchor="middle" class="mono">trigram + recency</text>
+
+  <rect x="390" y="82" width="140" height="36" rx="6" class="dim"/>
+  <text x="460" y="100" text-anchor="middle" class="title">Industry</text>
+  <text x="460" y="112" text-anchor="middle" class="mono">Σ years in target</text>
+
+  <rect x="390" y="124" width="140" height="36" rx="6" class="dim"/>
+  <text x="460" y="142" text-anchor="middle" class="title">Geography</text>
+  <text x="460" y="154" text-anchor="middle" class="mono">ISO code match</text>
+
+  <rect x="390" y="166" width="140" height="36" rx="6" class="dim"/>
+  <text x="460" y="184" text-anchor="middle" class="title">Seniority</text>
+  <text x="460" y="196" text-anchor="middle" class="mono">years → level + kwds</text>
+
+  <rect x="390" y="208" width="140" height="36" rx="6" class="dim"/>
+  <text x="460" y="226" text-anchor="middle" class="title">Skills</text>
+  <text x="460" y="238" text-anchor="middle" class="mono">hits/target × years</text>
+
+  <rect x="390" y="250" width="140" height="36" rx="6" class="dim"/>
+  <text x="460" y="268" text-anchor="middle" class="title">Languages</text>
+  <text x="460" y="280" text-anchor="middle" class="mono">fraction @ proficiency</text>
+
+  <!-- Weighted sum -->
+  <rect x="560" y="130" width="160" height="60" rx="8" class="box"/>
+  <text x="640" y="152" text-anchor="middle" class="title">Weighted Sum</text>
+  <text x="640" y="168" text-anchor="middle" class="mono">Σ(dim.score × dim.weight)</text>
+  <text x="640" y="180" text-anchor="middle" class="sub">parser-provided weights</text>
+
+  <!-- Top-K -->
+  <rect x="750" y="130" width="100" height="60" rx="8" class="box"/>
+  <text x="800" y="152" text-anchor="middle" class="title">Top 5</text>
+  <text x="800" y="168" text-anchor="middle" class="sub">sort · slice</text>
+
+  <!-- Output -->
+  <rect x="560" y="310" width="390" height="80" rx="8" class="out"/>
+  <text x="755" y="332" text-anchor="middle" class="title">det_picks : list[CandidateResult]</text>
+  <text x="755" y="350" text-anchor="middle" class="sub">5 candidates — each with per-dim breakdown</text>
+  <text x="755" y="366" text-anchor="middle" class="mono">{ industry: 1.0, geography: 1.0, seniority: 0.5, skills: 0.47 }</text>
+  <text x="755" y="382" text-anchor="middle" class="sub">plus auto-generated match_explanation + deterministic highlights</text>
+
+  <!-- Arrows -->
+  <path class="arrow" d="M160 100 L188 100"/>
+  <path class="arrow" d="M350 100 L388 60"/>
+  <path class="arrow" d="M350 100 L388 100"/>
+  <path class="arrow" d="M350 100 L388 140"/>
+  <path class="arrow" d="M350 100 L388 182"/>
+  <path class="arrow" d="M350 100 L388 224"/>
+  <path class="arrow" d="M350 100 L388 266"/>
+  <path class="arrow" d="M530 58 L558 142"/>
+  <path class="arrow" d="M530 100 L558 148"/>
+  <path class="arrow" d="M530 140 L558 154"/>
+  <path class="arrow" d="M530 182 L558 168"/>
+  <path class="arrow" d="M530 224 L558 176"/>
+  <path class="arrow" d="M530 266 L558 184"/>
+  <path class="arrow" d="M720 160 L748 160"/>
+  <path class="arrow" d="M800 190 L800 240 L755 240 L755 310"/>
+
+  <!-- Callouts -->
+  <text x="20" y="230" class="sub" font-weight="600">Why six dims (not one blob)?</text>
+  <text x="20" y="246" class="sub">Brief wants "deliberate signal weighting" —</text>
+  <text x="20" y="260" class="sub">query can emphasise seniority OR industry</text>
+  <text x="20" y="274" class="sub">differently. Separate dims make this explicit.</text>
+
+  <text x="20" y="300" class="sub" font-weight="600">Why explainable per_dim?</text>
+  <text x="20" y="316" class="sub">Senior associate can see WHY a candidate</text>
+  <text x="20" y="330" class="sub">ranked where they did — satisfies brief's</text>
+  <text x="20" y="344" class="sub">"explain its judgement" requirement natively.</text>
+
+  <text x="20" y="370" class="sub" font-weight="600">Why hard filter at 0.30?</text>
+  <text x="20" y="386" class="sub">Trivial trigram overlap (~0.15) shouldn't</text>
+  <text x="20" y="400" class="sub">pass a required dim. Explicit threshold.</text>
+</svg>

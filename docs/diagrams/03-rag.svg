@@ -1,0 +1,91 @@
+<svg viewBox="0 0 960 430" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, -apple-system, sans-serif">
+  <style>
+    .box { fill: #f5f7fb; stroke: #1f3a68; stroke-width: 1.5; }
+    .llm { fill: #fff3e0; stroke: #c7740b; stroke-width: 1.5; }
+    .data { fill: #e7f3ea; stroke: #2a7d4d; stroke-width: 1.5; }
+    .out { fill: #fceef0; stroke: #a63446; stroke-width: 1.5; }
+    .title { font-size: 13px; font-weight: 600; fill: #1b1b1b; }
+    .sub { font-size: 11px; fill: #444; }
+    .arrow { fill: none; stroke: #1f3a68; stroke-width: 1.5; marker-end: url(#arr3); }
+    .mono { font-family: ui-monospace, "SF Mono", monospace; font-size: 10px; fill: #444; }
+  </style>
+  <defs>
+    <marker id="arr3" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1f3a68"/>
+    </marker>
+  </defs>
+
+  <text x="480" y="24" text-anchor="middle" font-size="16" font-weight="700">RAG Agent — retrieval + rerank</text>
+
+  <!-- Input: query + spec -->
+  <rect x="20" y="60" width="150" height="56" rx="8" class="box"/>
+  <text x="95" y="82" text-anchor="middle" class="title">Query + Spec</text>
+  <text x="95" y="98" text-anchor="middle" class="sub">text + view_weights</text>
+
+  <!-- Embed query -->
+  <rect x="200" y="60" width="130" height="56" rx="8" class="llm"/>
+  <text x="265" y="82" text-anchor="middle" class="title">Embed query</text>
+  <text x="265" y="98" text-anchor="middle" class="sub">1536-dim vector</text>
+
+  <!-- Full-scan vector -->
+  <rect x="360" y="30" width="220" height="56" rx="8" class="box"/>
+  <text x="470" y="48" text-anchor="middle" class="title">Full-scan cosine</text>
+  <text x="470" y="64" text-anchor="middle" class="sub">numpy matmul · 30 360 × 1536</text>
+  <text x="470" y="76" text-anchor="middle" class="mono">~20 ms</text>
+
+  <!-- Full-scan BM25 -->
+  <rect x="360" y="95" width="220" height="56" rx="8" class="box"/>
+  <text x="470" y="113" text-anchor="middle" class="title">Full-scan BM25</text>
+  <text x="470" y="129" text-anchor="middle" class="sub">rank_bm25 · 30 360 docs</text>
+  <text x="470" y="141" text-anchor="middle" class="mono">~10 ms</text>
+
+  <!-- Aggregate + fuse -->
+  <rect x="610" y="60" width="160" height="56" rx="8" class="box"/>
+  <text x="690" y="78" text-anchor="middle" class="title">Aggregate · Fuse</text>
+  <text x="690" y="94" text-anchor="middle" class="sub">reshape (10 120, 3)</text>
+  <text x="690" y="106" text-anchor="middle" class="sub">view-weighted → RRF</text>
+
+  <!-- Top-50 -->
+  <rect x="800" y="60" width="140" height="56" rx="8" class="box"/>
+  <text x="870" y="82" text-anchor="middle" class="title">Top 50 by RRF</text>
+  <text x="870" y="98" text-anchor="middle" class="sub">candidate pool</text>
+
+  <!-- Rerank -->
+  <rect x="630" y="180" width="310" height="110" rx="8" class="llm"/>
+  <text x="785" y="204" text-anchor="middle" class="title">Parallel Pointwise Rerank</text>
+  <text x="785" y="222" text-anchor="middle" class="sub">ThreadPoolExecutor · 8–16 workers</text>
+  <text x="785" y="238" text-anchor="middle" class="sub">1 LLM call per candidate · each returns</text>
+  <text x="785" y="252" text-anchor="middle" class="mono">{ score (0–100), match_explanation, highlights[] }</text>
+  <text x="785" y="270" text-anchor="middle" class="sub">Rerank 50 candidates in parallel, sort, take top 5</text>
+
+  <!-- Output -->
+  <rect x="630" y="320" width="310" height="56" rx="8" class="out"/>
+  <text x="785" y="342" text-anchor="middle" class="title">rag_picks : list[CandidateResult]</text>
+  <text x="785" y="358" text-anchor="middle" class="sub">5 candidates with LLM score, explanation, highlights</text>
+
+  <!-- Arrows -->
+  <path class="arrow" d="M170 88 L198 88"/>
+  <path class="arrow" d="M330 82 L360 58"/>
+  <path class="arrow" d="M330 92 L360 120"/>
+  <path class="arrow" d="M580 58 L615 82"/>
+  <path class="arrow" d="M580 123 L615 94"/>
+  <path class="arrow" d="M770 88 L798 88"/>
+  <path class="arrow" d="M870 116 Q 870 180, 785 180"/>
+  <path class="arrow" d="M785 290 L785 320"/>
+
+  <!-- Callouts -->
+  <text x="20" y="180" class="sub" font-weight="600">Why full-scan, not ANN top-K?</text>
+  <text x="20" y="196" class="sub">30 K embeddings fit in 180 MB RAM; matmul is ~20 ms.</text>
+  <text x="20" y="210" class="sub">Top-K returns docs not candidates — grouping becomes</text>
+  <text x="20" y="224" class="sub">lossy (some candidates lose view scores).</text>
+
+  <text x="20" y="260" class="sub" font-weight="600">Why hybrid + RRF?</text>
+  <text x="20" y="276" class="sub">Vector: "pharma" → "Pharmaceutical" semantics.</text>
+  <text x="20" y="290" class="sub">BM25: exact-string hits (Pfizer, FDA, Saudi Aramco).</text>
+  <text x="20" y="304" class="sub">RRF: no normalization needed, distributions differ.</text>
+
+  <text x="20" y="340" class="sub" font-weight="600">Why pointwise parallel, not listwise?</text>
+  <text x="20" y="356" class="sub">8 parallel calls → bounded by slowest (~6 s) not sum.</text>
+  <text x="20" y="370" class="sub">Per-candidate reasoning more accurate than list-sort.</text>
+  <text x="20" y="384" class="sub">Graceful degradation — per-call failures skip cleanly.</text>
+</svg>

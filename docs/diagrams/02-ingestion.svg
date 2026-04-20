@@ -1,0 +1,76 @@
+<svg viewBox="0 0 960 360" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, -apple-system, sans-serif">
+  <style>
+    .box { fill: #f5f7fb; stroke: #1f3a68; stroke-width: 1.5; }
+    .ext { fill: #ebe8f5; stroke: #5844a3; stroke-width: 1.5; }
+    .data { fill: #e7f3ea; stroke: #2a7d4d; stroke-width: 1.5; }
+    .llm { fill: #fff3e0; stroke: #c7740b; stroke-width: 1.5; }
+    .title { font-size: 13px; font-weight: 600; fill: #1b1b1b; }
+    .sub { font-size: 11px; fill: #444; }
+    .arrow { fill: none; stroke: #1f3a68; stroke-width: 1.5; marker-end: url(#arr2); }
+    .smallnote { font-size: 10px; fill: #666; font-style: italic; }
+  </style>
+  <defs>
+    <marker id="arr2" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1f3a68"/>
+    </marker>
+  </defs>
+
+  <text x="480" y="24" text-anchor="middle" font-size="16" font-weight="700">Ingestion Pipeline — POST /ingest</text>
+
+  <!-- Postgres -->
+  <rect x="20" y="80" width="150" height="80" rx="8" class="ext"/>
+  <text x="95" y="106" text-anchor="middle" class="title">Postgres</text>
+  <text x="95" y="124" text-anchor="middle" class="sub">candidates · work · edu</text>
+  <text x="95" y="138" text-anchor="middle" class="sub">skills · languages · lookups</text>
+  <text x="95" y="152" text-anchor="middle" class="sub">10 120 candidates</text>
+
+  <!-- Bulk fetch -->
+  <rect x="200" y="80" width="180" height="80" rx="8" class="box"/>
+  <text x="290" y="106" text-anchor="middle" class="title">Bulk Fetch</text>
+  <text x="290" y="124" text-anchor="middle" class="sub">5 queries total</text>
+  <text x="290" y="138" text-anchor="middle" class="sub">(not 40 000 N+1)</text>
+  <text x="290" y="152" text-anchor="middle" class="sub">~8 s for 10K</text>
+
+  <!-- Probe texts -->
+  <rect x="410" y="50" width="180" height="50" rx="8" class="box"/>
+  <text x="500" y="72" text-anchor="middle" class="title">Summary view</text>
+  <text x="500" y="88" text-anchor="middle" class="sub">"Sara is a Regulatory Affairs..."</text>
+
+  <rect x="410" y="110" width="180" height="50" rx="8" class="box"/>
+  <text x="500" y="132" text-anchor="middle" class="title">Work view</text>
+  <text x="500" y="148" text-anchor="middle" class="sub">"Sara's career includes..."</text>
+
+  <rect x="410" y="170" width="180" height="50" rx="8" class="box"/>
+  <text x="500" y="192" text-anchor="middle" class="title">Skills / Education view</text>
+  <text x="500" y="208" text-anchor="middle" class="sub">"Sara is expert in Brand Marketing..."</text>
+
+  <text x="500" y="245" text-anchor="middle" class="smallnote">Natural-language prose, not raw concatenation — aligns with query embedding space</text>
+
+  <!-- Embedder -->
+  <rect x="620" y="110" width="150" height="60" rx="8" class="llm"/>
+  <text x="695" y="134" text-anchor="middle" class="title">Embedding client</text>
+  <text x="695" y="150" text-anchor="middle" class="sub">text-embedding-3-small</text>
+  <text x="695" y="162" text-anchor="middle" class="sub">8 parallel workers</text>
+
+  <!-- Chroma -->
+  <rect x="800" y="110" width="140" height="60" rx="8" class="data"/>
+  <text x="870" y="134" text-anchor="middle" class="title">Chroma</text>
+  <text x="870" y="150" text-anchor="middle" class="sub">30 360 vectors</text>
+  <text x="870" y="162" text-anchor="middle" class="sub">+ metadata per doc</text>
+
+  <!-- Arrows -->
+  <path class="arrow" d="M170 120 L198 120"/>
+  <path class="arrow" d="M380 115 L440 75"/>
+  <path class="arrow" d="M380 120 L440 135"/>
+  <path class="arrow" d="M380 125 L440 195"/>
+  <path class="arrow" d="M590 75  L680 125"/>
+  <path class="arrow" d="M590 135 L680 140"/>
+  <path class="arrow" d="M590 195 L680 150"/>
+  <path class="arrow" d="M770 140 L798 140"/>
+
+  <!-- Performance box -->
+  <rect x="20" y="270" width="920" height="70" rx="8" fill="#fafbfc" stroke="#d0d5db"/>
+  <text x="480" y="292" text-anchor="middle" font-size="12" font-weight="600">Resumable · rate-limit-safe · live progress</text>
+  <text x="480" y="310" text-anchor="middle" class="sub">Existing doc IDs skipped on restart · RateLimitError cancels pending work · stdout bar: [█████····] 2100/30 360  rate 470 docs/s  ETA 60 s</text>
+  <text x="480" y="328" text-anchor="middle" class="sub">Full 10 120 × 3 = 30 360 docs embedded in ~72 s</text>
+</svg>

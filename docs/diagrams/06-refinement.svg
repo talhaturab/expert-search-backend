@@ -1,0 +1,101 @@
+<svg viewBox="0 0 960 380" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, -apple-system, sans-serif">
+  <style>
+    .box { fill: #f5f7fb; stroke: #1f3a68; stroke-width: 1.5; }
+    .llm { fill: #fff3e0; stroke: #c7740b; stroke-width: 1.5; }
+    .data { fill: #e7f3ea; stroke: #2a7d4d; stroke-width: 1.5; }
+    .out { fill: #fceef0; stroke: #a63446; stroke-width: 1.5; }
+    .title { font-size: 13px; font-weight: 600; fill: #1b1b1b; }
+    .sub { font-size: 11px; fill: #444; }
+    .arrow { fill: none; stroke: #1f3a68; stroke-width: 1.5; marker-end: url(#arr6); }
+    .branch { fill: none; stroke: #c7740b; stroke-width: 1.5; stroke-dasharray: 4 3; marker-end: url(#arr6o); }
+    .mono { font-family: ui-monospace, "SF Mono", monospace; font-size: 10px; fill: #444; }
+  </style>
+  <defs>
+    <marker id="arr6" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1f3a68"/>
+    </marker>
+    <marker id="arr6o" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#c7740b"/>
+    </marker>
+  </defs>
+
+  <text x="480" y="24" text-anchor="middle" font-size="16" font-weight="700">Conversation Context — Fresh vs. Refinement Path</text>
+
+  <!-- Turn 1: fresh -->
+  <rect x="20" y="60" width="220" height="70" rx="8" class="box"/>
+  <text x="130" y="82" text-anchor="middle" class="title">Turn 1 — Fresh</text>
+  <text x="130" y="100" text-anchor="middle" class="sub">POST /chat {</text>
+  <text x="130" y="114" text-anchor="middle" class="mono">query: "pharma experts in ME"</text>
+  <text x="130" y="128" text-anchor="middle" class="sub">}</text>
+
+  <!-- Fresh pipeline -->
+  <rect x="280" y="60" width="200" height="70" rx="8" class="box"/>
+  <text x="380" y="82" text-anchor="middle" class="title">Full pipeline</text>
+  <text x="380" y="100" text-anchor="middle" class="sub">retrieve all 30 K →</text>
+  <text x="380" y="114" text-anchor="middle" class="sub">rerank top-50 · det · judge</text>
+
+  <!-- Store turn 1 -->
+  <rect x="530" y="60" width="180" height="70" rx="8" class="data"/>
+  <text x="620" y="82" text-anchor="middle" class="title">Session Store</text>
+  <text x="620" y="100" text-anchor="middle" class="sub">cid → last turn</text>
+  <text x="620" y="114" text-anchor="middle" class="mono">suggested=[c1…c5]</text>
+
+  <!-- Response 1 -->
+  <rect x="760" y="60" width="180" height="70" rx="8" class="out"/>
+  <text x="850" y="82" text-anchor="middle" class="title">Response + cid</text>
+  <text x="850" y="100" text-anchor="middle" class="sub">suggested=[5 candidates]</text>
+  <text x="850" y="114" text-anchor="middle" class="mono">is_refinement=false</text>
+
+  <!-- Turn 2: refine -->
+  <rect x="20" y="200" width="220" height="70" rx="8" class="box"/>
+  <text x="130" y="222" text-anchor="middle" class="title">Turn 2 — Refinement</text>
+  <text x="130" y="240" text-anchor="middle" class="sub">POST /chat {</text>
+  <text x="130" y="254" text-anchor="middle" class="mono">query: "filter those to Saudi"</text>
+  <text x="130" y="265" text-anchor="middle" class="mono">conversation_id: same cid</text>
+
+  <!-- Parser with context -->
+  <rect x="280" y="190" width="200" height="56" rx="8" class="llm"/>
+  <text x="380" y="210" text-anchor="middle" class="title">Parser + prior context</text>
+  <text x="380" y="226" text-anchor="middle" class="sub">injects PRIOR TURN block</text>
+  <text x="380" y="238" text-anchor="middle" class="mono">is_refinement → true</text>
+
+  <!-- Restricted pool path -->
+  <rect x="280" y="260" width="200" height="56" rx="8" class="box"/>
+  <text x="380" y="280" text-anchor="middle" class="title">Restricted pool (≤5)</text>
+  <text x="380" y="296" text-anchor="middle" class="sub">fetch prior suggested only</text>
+  <text x="380" y="308" text-anchor="middle" class="sub">skip 30 K retrieval</text>
+
+  <!-- Rerank + det on pool -->
+  <rect x="530" y="225" width="200" height="70" rx="8" class="box"/>
+  <text x="630" y="247" text-anchor="middle" class="title">Score on pool</text>
+  <text x="630" y="263" text-anchor="middle" class="sub">det_on_pool + rerank + judge</text>
+  <text x="630" y="279" text-anchor="middle" class="sub">operates on 5 bundles, not 30 K</text>
+
+  <!-- Response 2 -->
+  <rect x="760" y="225" width="180" height="70" rx="8" class="out"/>
+  <text x="850" y="247" text-anchor="middle" class="title">Response</text>
+  <text x="850" y="263" text-anchor="middle" class="mono">is_refinement=true</text>
+  <text x="850" y="277" text-anchor="middle" class="sub">subset of prior 5</text>
+  <text x="850" y="289" text-anchor="middle" class="sub">or empty + explanation</text>
+
+  <!-- Arrows fresh -->
+  <path class="arrow" d="M240 95 L278 95"/>
+  <path class="arrow" d="M480 95 L528 95"/>
+  <path class="arrow" d="M710 95 L758 95"/>
+
+  <!-- Arrows refinement -->
+  <path class="arrow" d="M240 235 L278 218"/>
+  <path class="branch" d="M380 246 L380 260"/>
+  <path class="arrow" d="M480 288 L528 268"/>
+  <path class="arrow" d="M730 258 L758 258"/>
+
+  <!-- Read prior turn -->
+  <path class="branch" d="M620 130 L620 150 L380 150 L380 190"/>
+  <text x="500" y="172" class="sub" fill="#c7740b">parser reads prior suggested</text>
+
+  <!-- Legend -->
+  <rect x="760" y="325" width="14" height="14" class="llm"/>
+  <text x="780" y="337" class="sub">LLM call</text>
+  <path class="branch" d="M840 335 L870 335"/>
+  <text x="877" y="338" class="sub">context flow</text>
+</svg>

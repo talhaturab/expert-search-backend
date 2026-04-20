@@ -1,0 +1,119 @@
+<svg viewBox="0 0 960 370" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, -apple-system, sans-serif">
+  <style>
+    .box { fill: #f5f7fb; stroke: #1f3a68; stroke-width: 1.5; }
+    .llm { fill: #fff3e0; stroke: #c7740b; stroke-width: 1.5; }
+    .data { fill: #e7f3ea; stroke: #2a7d4d; stroke-width: 1.5; }
+    .ext  { fill: #ebe8f5; stroke: #5844a3; stroke-width: 1.5; }
+    .title { font-size: 13px; font-weight: 600; fill: #1b1b1b; }
+    .sub   { font-size: 11px; fill: #444; }
+    .mini  { font-size: 10px; fill: #666; }
+    .arrow { fill: none; stroke: #1f3a68; stroke-width: 1.5; marker-end: url(#arr); }
+    .dashed { fill: none; stroke: #5a5a5a; stroke-width: 1.2; stroke-dasharray: 4 3; marker-end: url(#arrg); }
+  </style>
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1f3a68"/>
+    </marker>
+    <marker id="arrg" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#5a5a5a"/>
+    </marker>
+  </defs>
+
+  <text x="480" y="24" text-anchor="middle" font-size="16" font-weight="700">Expert Search — End-to-End Architecture</text>
+
+  <!-- ───────── Top row: request flow ───────── -->
+
+  <!-- Client -->
+  <rect x="20" y="70" width="120" height="56" rx="8" class="box"/>
+  <text x="80" y="93" text-anchor="middle" class="title">Client</text>
+  <text x="80" y="110" text-anchor="middle" class="sub">POST /chat</text>
+
+  <!-- Parser (LLM) -->
+  <rect x="180" y="70" width="140" height="56" rx="8" class="llm"/>
+  <text x="250" y="90" text-anchor="middle" class="title">Query Parser</text>
+  <text x="250" y="106" text-anchor="middle" class="sub">1 LLM call</text>
+  <text x="250" y="118" text-anchor="middle" class="sub">→ ParsedSpec</text>
+
+  <!-- RAG -->
+  <rect x="370" y="36" width="230" height="56" rx="8" class="box"/>
+  <text x="485" y="58" text-anchor="middle" class="title">RAG Agent</text>
+  <text x="485" y="74" text-anchor="middle" class="sub">cosine + BM25 + RRF →</text>
+  <text x="485" y="86" text-anchor="middle" class="sub">parallel rerank (≤50 LLM calls)</text>
+
+  <!-- Deterministic -->
+  <rect x="370" y="104" width="230" height="56" rx="8" class="box"/>
+  <text x="485" y="126" text-anchor="middle" class="title">Deterministic Agent</text>
+  <text x="485" y="142" text-anchor="middle" class="sub">6 scoring dims · weighted sum</text>
+  <text x="485" y="154" text-anchor="middle" class="sub">zero LLM calls</text>
+
+  <!-- Judge (LLM) -->
+  <rect x="650" y="70" width="140" height="56" rx="8" class="llm"/>
+  <text x="720" y="90" text-anchor="middle" class="title">Judge</text>
+  <text x="720" y="106" text-anchor="middle" class="sub">1 LLM call</text>
+  <text x="720" y="118" text-anchor="middle" class="sub">cherry-picks top-5</text>
+
+  <!-- Response -->
+  <rect x="830" y="70" width="110" height="56" rx="8" class="box"/>
+  <text x="885" y="93" text-anchor="middle" class="title">Response</text>
+  <text x="885" y="110" text-anchor="middle" class="sub">rag · det ·</text>
+  <text x="885" y="122" text-anchor="middle" class="sub">suggested · reasoning</text>
+
+  <!-- Request-flow arrows -->
+  <!-- client → parser -->
+  <path class="arrow" d="M140 98 L178 98"/>
+  <!-- parser → rag (fork up) -->
+  <path class="arrow" d="M320 88 Q 345 70, 368 64"/>
+  <!-- parser → det (fork down) -->
+  <path class="arrow" d="M320 108 Q 345 126, 368 132"/>
+  <!-- rag → judge (merge down) -->
+  <path class="arrow" d="M600 64 Q 630 80, 648 92"/>
+  <!-- det → judge (merge up) -->
+  <path class="arrow" d="M600 132 Q 630 116, 648 104"/>
+  <!-- judge → response -->
+  <path class="arrow" d="M790 98 L828 98"/>
+
+  <!-- ───────── Bottom row: data / services ───────── -->
+  <text x="480" y="208" text-anchor="middle" font-size="12" font-weight="600" fill="#444">Backing data &amp; services</text>
+
+  <rect x="40" y="222" width="180" height="76" rx="8" class="ext"/>
+  <text x="130" y="244" text-anchor="middle" class="title">Postgres (read-only)</text>
+  <text x="130" y="262" text-anchor="middle" class="mini">10 120 candidate bundles</text>
+  <text x="130" y="276" text-anchor="middle" class="mini">+ vocabulary lookup lists</text>
+  <text x="130" y="290" text-anchor="middle" class="sub">used by: Parser · Deterministic</text>
+
+  <rect x="240" y="222" width="180" height="76" rx="8" class="data"/>
+  <text x="330" y="244" text-anchor="middle" class="title">Chroma + rank_bm25</text>
+  <text x="330" y="262" text-anchor="middle" class="mini">30 360 embeddings + BM25 index</text>
+  <text x="330" y="276" text-anchor="middle" class="mini">(10 120 × 3 probe-text views)</text>
+  <text x="330" y="290" text-anchor="middle" class="sub">used by: RAG Agent</text>
+
+  <rect x="440" y="222" width="180" height="76" rx="8" class="data"/>
+  <text x="530" y="244" text-anchor="middle" class="title">Session Store</text>
+  <text x="530" y="262" text-anchor="middle" class="mini">{conversation_id → last turn}</text>
+  <text x="530" y="276" text-anchor="middle" class="mini">in-memory · 30-min TTL</text>
+  <text x="530" y="290" text-anchor="middle" class="sub">used by: orchestrator + Parser</text>
+
+  <rect x="640" y="222" width="280" height="76" rx="8" class="ext"/>
+  <text x="780" y="244" text-anchor="middle" class="title">OpenRouter</text>
+  <text x="780" y="262" text-anchor="middle" class="mini">Haiku 4.5 (chat) · text-embedding-3-small</text>
+  <text x="780" y="276" text-anchor="middle" class="mini">strict JSON-schema structured outputs</text>
+  <text x="780" y="290" text-anchor="middle" class="sub">used by: Parser · RAG rerank · Judge</text>
+
+  <!-- Lightweight data-access hints (dashed, very short to avoid tangling) -->
+  <path class="dashed" d="M130 222 L130 140 L200 140 L200 126"/>    <!-- Postgres → Parser -->
+  <path class="dashed" d="M210 222 L210 180 L450 180 L450 160"/>    <!-- Postgres → Det -->
+  <path class="dashed" d="M330 222 L330 175 L360 175 L360 64 L370 64"/>  <!-- Chroma → RAG (routes around Det) -->
+  <path class="dashed" d="M530 222 L530 185 L250 185 L250 126"/>    <!-- SessionStore → Parser (routes below Det) -->
+  <path class="dashed" d="M780 222 L780 126"/>                      <!-- OpenRouter → Judge -->
+
+  <!-- Legend -->
+  <rect x="20" y="330" width="14" height="14" class="box"/>
+  <text x="40" y="342" class="mini">deterministic compute</text>
+  <rect x="170" y="330" width="14" height="14" class="llm"/>
+  <text x="190" y="342" class="mini">LLM call</text>
+  <rect x="260" y="330" width="14" height="14" class="data"/>
+  <text x="280" y="342" class="mini">local data</text>
+  <rect x="350" y="330" width="14" height="14" class="ext"/>
+  <text x="370" y="342" class="mini">external service</text>
+  <text x="520" y="342" class="mini">— solid arrow: request flow      - - - dashed: data access</text>
+</svg>
