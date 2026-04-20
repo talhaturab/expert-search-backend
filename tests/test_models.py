@@ -61,3 +61,41 @@ def test_chat_response_shape():
         reasoning="empty",
     )
     assert resp.query == "q"
+
+
+def test_parsed_spec_has_is_refinement_default_false():
+    from app.models import ParsedSpec
+    spec = ParsedSpec(temporality="any")
+    assert spec.is_refinement is False
+
+
+def test_chat_response_carries_conversation_id_and_is_refinement():
+    from app.models import ChatResponse, ParsedSpec
+    resp = ChatResponse(
+        query="q", conversation_id="abc-123", is_refinement=True,
+        parsed_spec=ParsedSpec(temporality="any"),
+        rag_picks=[], det_picks=[], suggested=[], reasoning="",
+    )
+    assert resp.conversation_id == "abc-123"
+    assert resp.is_refinement is True
+
+
+def test_chat_response_is_refinement_defaults_false():
+    from app.models import ChatResponse, ParsedSpec
+    resp = ChatResponse(
+        query="q", conversation_id="x",
+        parsed_spec=ParsedSpec(temporality="any"),
+        rag_picks=[], det_picks=[], suggested=[], reasoning="",
+    )
+    assert resp.is_refinement is False
+
+
+def test_prior_context_dataclass_exists_with_expected_shape():
+    from app.models import PriorContext, ParsedSpec
+    pc = PriorContext(
+        prior_query="foo",
+        prior_parsed_spec=ParsedSpec(temporality="any"),
+        prior_suggested_ids=["a", "b"],
+    )
+    assert pc.prior_query == "foo"
+    assert pc.prior_suggested_ids == ["a", "b"]

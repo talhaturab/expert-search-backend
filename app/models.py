@@ -54,6 +54,7 @@ class ParsedSpec(BaseModel):
     min_years_exp: int | None = None
     temporality: Literal["current", "past", "any"] = "any"
     view_weights: ViewWeights | None = None
+    is_refinement: bool = False
 
 
 # ---------- Result structures ----------
@@ -128,3 +129,15 @@ class IngestResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]
     checks: dict[str, bool]
+
+
+from dataclasses import dataclass
+
+
+@dataclass
+class PriorContext:
+    """Internal container passed from SearchService into the query parser so it
+    can decide whether the new turn is a refinement of the prior turn."""
+    prior_query: str
+    prior_parsed_spec: ParsedSpec
+    prior_suggested_ids: list[str]
