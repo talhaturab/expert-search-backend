@@ -15,15 +15,22 @@ import pytest
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 
-
-# Load the repo's .env so integration tests can find OPENROUTER_API_KEY etc.
-# (Unit tests deliberately isolate from .env; integration tests need it.)
-load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
-
-from app.main import create_app  # noqa: E402 — must follow env loading
+from app.main import create_app
 
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.fixture(autouse=True)
+def _load_real_env():
+    """Load the repo's .env so integration tests can find OPENROUTER_API_KEY etc.
+
+    This runs inside each integration test (function scope). We deliberately
+    avoid `load_dotenv` at module scope: pytest imports all test modules during
+    collection, which would leak env vars into unit tests that rely on the
+    default `Settings` values (HYDE_ENABLED, INGEST_LIMIT, etc.).
+    """
+    load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env", override=True)
 
 
 def _env_or_skip():
