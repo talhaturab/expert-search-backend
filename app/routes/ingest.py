@@ -14,11 +14,11 @@ router = APIRouter()
 def ingest(req: IngestRequest) -> IngestResponse:
     s = get_settings()
     store = ChromaStore(persist_path=s.chroma_persist_path)
-    if store.count() > 0 and not req.force:
+    if store.count() > 0 and not req.force and not req.reset:
         return IngestResponse(
-            candidates_indexed=0,
-            documents_written=0,
-            duration_seconds=0.0,
+            candidates_loaded=0, documents_to_process=0, documents_written=0,
+            documents_skipped_existing=store.count(),
+            stopped_reason="already_populated", duration_seconds=0.0,
         )
     result = build_index(
         dsn=s.database_url,
@@ -26,6 +26,7 @@ def ingest(req: IngestRequest) -> IngestResponse:
         embedding_model=s.embedding_model,
         store=store,
         limit=s.ingest_limit,
+        reset=req.reset,
     )
     # Chroma was rebuilt — any cached SearchService now holds stale vectors.
     invalidate_search_service()

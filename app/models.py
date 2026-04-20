@@ -110,12 +110,16 @@ class ChatResponse(BaseModel):
 
 
 class IngestRequest(BaseModel):
-    force: bool = False  # re-embed even if the Chroma collection already exists
+    force: bool = False  # proceed even if the Chroma collection already has content
+    reset: bool = False  # wipe existing collection first (fresh start)
 
 
 class IngestResponse(BaseModel):
-    candidates_indexed: int
+    candidates_loaded: int
+    documents_to_process: int
     documents_written: int
+    documents_skipped_existing: int
+    stopped_reason: str | None = None
     duration_seconds: float
 
 

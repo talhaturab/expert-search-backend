@@ -15,9 +15,9 @@ class Settings(BaseSettings):
     deterministic_top_k: int = 5
     final_top_k: int = 5
 
-    # Cap for offline indexing (None = all 10k candidates).
-    # Starts at 200 for fast dev cycles; raise to None when ready for full run.
-    ingest_limit: int | None = 200
+    # Cap for offline indexing (None = all candidates).
+    # Override in .env with INGEST_LIMIT=200 for fast dev cycles.
+    ingest_limit: int | None = None
 
 
 def get_settings() -> Settings:

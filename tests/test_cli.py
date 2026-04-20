@@ -32,8 +32,9 @@ def test_cli_chat_prints_json_response(monkeypatch, capsys, tmp_path):
 def test_cli_ingest_prints_summary(monkeypatch, capsys, tmp_path):
     _base_env(monkeypatch, tmp_path)
     with patch("app.cli.build_index",
-               return_value={"candidates_indexed": 42, "documents_written": 126,
-                             "duration_seconds": 5.0}):
+               return_value={"candidates_loaded": 42, "documents_to_process": 126,
+                             "documents_written": 126, "documents_skipped_existing": 0,
+                             "stopped_reason": None, "duration_seconds": 5.0}):
         rc = main(["ingest", "--force"])
     assert rc == 0
     out = capsys.readouterr().out
