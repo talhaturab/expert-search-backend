@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     llm_model: str = "anthropic/claude-3.5-sonnet"
     embedding_model: str = "openai/text-embedding-3-small"
 
+    # Reasoning model used for Parser (1 call/query) + Judge (1 call/query).
+    # These are low-volume, quality-critical call sites. Rerank (≤50 calls/query)
+    # stays on `llm_model` to keep cost bounded.
+    reasoning_model: str = "openai/gpt-5.4-20260305"
+    reasoning_effort: str = "medium"
+
     hyde_enabled: bool = True
     rag_top_k: int = 50
     deterministic_top_k: int = 5

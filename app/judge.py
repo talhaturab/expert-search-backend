@@ -80,7 +80,6 @@ def cherry_pick_top_five(
         ],
         response_model=JudgeDecision,
         temperature=0.0,
-        max_tokens=1500,
     )
 
     suggested: list[CandidateResult] = []

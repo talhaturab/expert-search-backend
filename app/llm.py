@@ -33,9 +33,36 @@ _retry = retry(
 
 
 class LLMClient:
-    def __init__(self, api_key: str, model: str, base_url: str = OPENROUTER_BASE):
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        base_url: str = OPENROUTER_BASE,
+        reasoning_effort: str | None = None,
+    ):
         self.model = model
+        # When set, `chat_structured` sends `reasoning={"effort": ...}` and
+        # omits `temperature` (reasoning models reject sampling params).
+        self.reasoning_effort = reasoning_effort
         self._client = OpenAI(base_url=base_url, api_key=api_key)
+
+    def _build_kwargs(
+        self,
+        messages: list[dict],
+        temperature: float,
+        max_tokens: int | None,
+    ) -> dict:
+        kwargs: dict = {
+            "model": self.model,
+            "input": messages,
+        }
+        if max_tokens is not None:
+            kwargs["max_output_tokens"] = max_tokens
+        if self.reasoning_effort is not None:
+            kwargs["reasoning"] = {"effort": self.reasoning_effort}
+        else:
+            kwargs["temperature"] = temperature
+        return kwargs
 
     @_retry
     def chat(
@@ -44,17 +71,9 @@ class LLMClient:
         temperature: float = 0.2,
         max_tokens: int | None = None,
     ) -> str:
-        """Plain text completion via the Responses API.
-
-        `messages` is a list of {role, content} dicts — passed as `input` to the
-        Responses API, which accepts either a string or a message list. Returns
-        the aggregated text output.
-        """
+        """Plain text completion via the Responses API."""
         resp = self._client.responses.create(
-            model=self.model,
-            input=messages,
-            temperature=temperature,
-            max_output_tokens=max_tokens,
+            **self._build_kwargs(messages, temperature, max_tokens)
         )
         return resp.output_text or ""
 
@@ -73,11 +92,8 @@ class LLMClient:
         validated JSON; SDK parses into the typed model.
         """
         resp = self._client.responses.parse(
-            model=self.model,
-            input=messages,
+            **self._build_kwargs(messages, temperature, max_tokens),
             text_format=response_model,
-            temperature=temperature,
-            max_output_tokens=max_tokens,
         )
         parsed = resp.output_parsed
         if parsed is None:

@@ -138,7 +138,6 @@ def parse_query(
         ],
         response_model=ParsedSpec,
         temperature=0.0,
-        max_tokens=1200,  # a touch more headroom — the spec+vocab now uses more of the context
     )
 
     if vocab is not None:

@@ -61,8 +61,14 @@ def get_search_service() -> SearchService:
     log.info("Loading DB vocabulary...")
     vocab = load_vocabulary(s.database_url)
 
-    # Clients.
+    # Clients. Two LLMs: `llm` for the high-volume RAG rerank (≤50 calls/query),
+    # `reasoning_llm` for Parser + Judge (1 call each, quality-critical).
     llm = LLMClient(api_key=s.openrouter_api_key, model=s.llm_model)
+    reasoning_llm = LLMClient(
+        api_key=s.openrouter_api_key,
+        model=s.reasoning_model,
+        reasoning_effort=s.reasoning_effort,
+    )
     embedder = EmbeddingClient(api_key=s.openrouter_api_key, model=s.embedding_model)
 
     def _fetch_bundle(cid: str) -> dict:
@@ -78,7 +84,7 @@ def get_search_service() -> SearchService:
         return filter_and_score(pool_bundles, spec, top_k=top_k)
 
     return SearchService(
-        parse_query=lambda q, prior_context=None: parse_query(q, llm=llm, vocab=vocab, prior_context=prior_context),
+        parse_query=lambda q, prior_context=None: parse_query(q, llm=reasoning_llm, vocab=vocab, prior_context=prior_context),
         embed_query=lambda t: embedder.embed_one(t),
         all_embeddings=embs,
         candidate_ids=candidate_ids_in_order,
@@ -90,7 +96,7 @@ def get_search_service() -> SearchService:
             all_bundles, spec, top_k=s.deterministic_top_k
         ),
         run_deterministic_on_pool=_det_on_pool,
-        judge=lambda q, rp, dp, pm: cherry_pick_top_five(q, rp, dp, pm, llm=llm),
+        judge=lambda q, rp, dp, pm: cherry_pick_top_five(q, rp, dp, pm, llm=reasoning_llm),
         fetch_bundle=_fetch_bundle,
         rag_top_k=s.rag_top_k,
         session_store=session_store,
