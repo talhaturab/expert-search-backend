@@ -10,7 +10,7 @@ Two retrieval agents run in parallel and a judge cherry-picks the final top 5:
 
 Every result returned to the caller carries the four fields the brief asks for: **candidate_id · relevance score · match explanation · key highlights**.
 
-**Status:** ingestion + RAG agent are live; deterministic agent + judge + full `/chat` route are in progress. See [`docs/superpowers/specs/2026-04-20-expert-search-design.md`](docs/superpowers/specs/2026-04-20-expert-search-design.md) for the full approved design.
+**Status:** All endpoints live — `/ingest`, `/chat`, `/experts/{id}`, `/health`. Both agents (RAG + deterministic) plus the judge run end-to-end against a real Postgres DB of ~10K candidates and OpenRouter. See [`docs/superpowers/specs/2026-04-20-expert-search-design.md`](docs/superpowers/specs/2026-04-20-expert-search-design.md) for the full approved design.
 
 ---
 
@@ -39,6 +39,17 @@ curl -s http://localhost:8000/health | jq
 
 Interactive API docs (Swagger) at `http://localhost:8000/docs`.
 
+### CLI companion
+
+Same core services, no HTTP round-trip:
+
+```bash
+poetry run python -m app.cli ingest --force
+poetry run python -m app.cli chat "regulatory affairs experts in pharma in the Middle East"
+```
+
+Prints `ChatResponse` as formatted JSON to stdout.
+
 ---
 
 ## Endpoints
@@ -47,8 +58,8 @@ Interactive API docs (Swagger) at `http://localhost:8000/docs`.
 |---|---|---|
 | `GET`  | `/health` | Liveness + readiness (DB reachable, Chroma populated, key set) |
 | `POST` | `/ingest` | Build / rebuild the vector index from Postgres |
-| `POST` | `/chat`   | Submit a NL query; return ranked experts (WIP) |
-| `GET`  | `/experts/{candidate_id}` | Full candidate profile as Markdown (WIP) |
+| `POST` | `/chat`   | Submit a NL query; return ranked experts |
+| `GET`  | `/experts/{candidate_id}` | Full candidate profile as Markdown |
 
 ### `POST /ingest`
 
@@ -64,7 +75,7 @@ Returns:
 
 By default indexing is capped at **200 candidates** (`INGEST_LIMIT` in `.env`) for fast dev iteration. Remove `INGEST_LIMIT` or set it to empty to index the full 10K.
 
-### `POST /chat` *(planned shape)*
+### `POST /chat`
 
 ```json
 { "query": "regulatory affairs experts in pharma in the Middle East" }
@@ -147,21 +158,30 @@ Structured outputs are done via the OpenAI **Responses API** (`client.responses.
 
 ```
 app/
-├── main.py               # FastAPI app factory
-├── config.py             # pydantic-settings Settings (loads from .env)
-├── models.py             # All Pydantic request/response/shared models
-├── db.py                 # Postgres loaders
-├── probe_texts.py        # Render summary/work/skills_edu views
-├── embeddings.py         # OpenRouter embedding client
-├── llm.py                # OpenRouter LLM client (chat + chat_structured)
-├── chroma_store.py       # Chroma wrapper
-├── bm25_index.py         # rank_bm25 wrapper
-├── ingest.py             # Offline indexer orchestration
-├── query_parser.py       # NL -> ParsedSpec via one LLM call
-├── rag_agent.py          # retrieve_candidates + rerank_and_explain
+├── main.py                # FastAPI app factory
+├── cli.py                 # CLI companion (chat, ingest subcommands)
+├── config.py              # pydantic-settings Settings (loads from .env)
+├── models.py              # All Pydantic request/response/shared models
+├── db.py                  # Postgres loaders
+├── vocabulary.py          # Load distinct DB values for parser grounding
+├── profile_builder.py     # Render candidate profiles (mini + full markdown)
+├── probe_texts.py         # Render summary/work/skills_edu views for embedding
+├── embeddings.py          # OpenRouter embedding client
+├── llm.py                 # OpenRouter LLM client (chat + chat_structured via Responses API)
+├── chroma_store.py        # Chroma wrapper
+├── bm25_index.py          # rank_bm25 wrapper
+├── ingest.py              # Offline indexer orchestration
+├── query_parser.py        # NL -> ParsedSpec via one structured LLM call
+├── scoring.py             # 6 per-dim deterministic scoring functions
+├── rag_agent.py           # retrieve_candidates + parallel pointwise rerank
+├── deterministic_agent.py # Hard-filter + weighted-sum scoring orchestration
+├── judge.py               # Single-LLM cherry-pick over both agents' picks
+├── search.py              # SearchService orchestrator (DI per stage)
 └── routes/
     ├── health.py
-    └── ingest.py
+    ├── ingest.py
+    ├── chat.py            # Lazy-loaded SearchService cached via @lru_cache
+    └── experts.py
 
 tests/                    # Pytest suite (mocked for unit, real services marked @pytest.mark.integration)
 docs/superpowers/specs/   # Design spec
@@ -186,4 +206,4 @@ poetry run pytest -v -m integration
 
 - **Conversational context** (follow-up queries like *"Filter those to Saudi only"*). The `ChatRequest` schema accepts `conversation_id` but it's currently a no-op; deferred.
 - **Evaluation & Precision design doc** (Part 3 of the brief) — written deliverable, intentionally deferred for a later iteration.
-- **HyDE** (hypothetical document embeddings at query time) — scaffolded via `HYDE_ENABLED` flag in `.env`, but the HyDE step is not wired up. Easy to add later if retrieval quality on vague queries needs it.
+- **HyDE** (hypothetical document embeddings at query time) — the `HYDE_ENABLED` flag exists in `.env` but the step is not wired into `SearchService`. Easy to add later if retrieval quality on vague queries proves insufficient.
