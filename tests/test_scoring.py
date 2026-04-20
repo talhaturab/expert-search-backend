@@ -83,6 +83,18 @@ def test_score_skills_hits_over_target(bundle_pharma_regulatory_uae):
     assert 0.55 < score < 0.75
 
 
+def test_score_skills_fuzzy_match_picks_up_variant_spelling(bundle_pharma_regulatory_uae):
+    # Candidate has "Regulatory Compliance"; query says "Regulatory compliances" (variant)
+    spec = SkillsSpec(values=["Regulatory compliances"], weight=0.1, required=False)
+    score = score_skills(bundle_pharma_regulatory_uae, spec)
+    assert score > 0.0  # fuzzy match should succeed
+
+
+def test_score_skills_no_match_returns_zero(bundle_pharma_regulatory_uae):
+    spec = SkillsSpec(values=["Quantum Computing"], weight=0.1, required=False)
+    assert score_skills(bundle_pharma_regulatory_uae, spec) == 0.0
+
+
 def test_score_languages_fraction_matched(bundle_pharma_regulatory_uae):
     spec = LanguagesSpec(values=["Arabic", "French"], required_proficiency=None,
                          weight=0.05, required=False)

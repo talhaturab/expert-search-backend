@@ -135,21 +135,55 @@ def score_seniority(bundle: dict, spec: SenioritySpec) -> float:
 
 # ---------- Skills ----------
 
+# Skills is a big-vocab field (1,551 distinct values) — we don't inject the list
+# into the parser prompt. Instead we match each LLM-emitted target skill against
+# the candidate's actual skills with exact + trigram fuzzy fallback.
+_SKILL_FUZZY_THRESHOLD = 0.80
+
+
+def _best_fuzzy_match(target: str, candidate_skills: dict[str, int]) -> tuple[str, int] | None:
+    """Return (candidate_skill_name, years) of the best trigram match above
+    threshold, or None if no candidate skill is close enough."""
+    best, best_score = None, 0.0
+    for name in candidate_skills:
+        s = _trgm_sim(target, name)
+        if s > best_score:
+            best, best_score = name, s
+    if best is not None and best_score >= _SKILL_FUZZY_THRESHOLD:
+        return best, candidate_skills[best]
+    return None
+
+
 def score_skills(bundle: dict, spec: SkillsSpec) -> float:
-    """Hits fraction × (0.7 + 0.3 × years factor)."""
+    """Hits fraction × (0.7 + 0.3 × years factor).
+
+    Each target skill is matched against the candidate's actual skills:
+    - exact case-insensitive match preferred,
+    - trigram fuzzy match (≥ 0.80 similarity) as fallback.
+    """
     if not spec.values:
         return 0.0
-    target_set = {t.lower() for t in spec.values}
     candidate_skills = {
         (s["skill"] or "").lower(): (s.get("years_of_experience") or 0)
         for s in bundle.get("skills", [])
     }
-    matched = target_set & candidate_skills.keys()
-    if not matched:
+    if not candidate_skills:
         return 0.0
-    years_values = [candidate_skills[m] for m in matched]
-    years_factor = min(sum(years_values) / (10 * len(matched)), 1.0)
-    hits_fraction = len(matched) / len(target_set)
+
+    matched_years: list[int] = []
+    for target in spec.values:
+        target_low = target.lower()
+        if target_low in candidate_skills:
+            matched_years.append(candidate_skills[target_low])
+            continue
+        m = _best_fuzzy_match(target_low, candidate_skills)
+        if m is not None:
+            matched_years.append(m[1])
+
+    if not matched_years:
+        return 0.0
+    years_factor = min(sum(matched_years) / (10 * len(matched_years)), 1.0)
+    hits_fraction = len(matched_years) / len(spec.values)
     return min(hits_fraction * (0.7 + 0.3 * years_factor), 1.0)
 
 

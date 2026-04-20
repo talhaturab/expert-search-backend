@@ -1,8 +1,14 @@
-"""NL query → ParsedSpec via a single structured-output LLM call."""
+"""NL query → ParsedSpec via a single structured-output LLM call.
+
+Optionally ground the parser against the DB's real vocabulary so the LLM picks
+exact strings (industries, skill categories, languages, proficiency) that match
+downstream SQL lookups without any fuzzy post-matching.
+"""
 from __future__ import annotations
 
 from app.llm import LLMClient
 from app.models import ParsedSpec
+from app.vocabulary import Vocabulary
 
 
 SYSTEM_PROMPT = """You are a candidate-search query parser. Convert the user's
@@ -61,14 +67,59 @@ CUSTOM WEIGHTING HEURISTICS (user-supplied — fill in with domain rules):
 """
 
 
-def parse_query(query: str, llm: LLMClient) -> ParsedSpec:
-    """Single structured LLM call. Returns a validated ParsedSpec."""
-    return llm.chat_structured(
+def _filter_to_known(values: list[str], known: list[str]) -> list[str]:
+    """Keep only values that appear (case-insensitively) in `known`, using the
+    known casing in the output. Unknown values are dropped."""
+    known_by_lower = {k.lower(): k for k in known}
+    out: list[str] = []
+    seen: set[str] = set()
+    for v in values:
+        canonical = known_by_lower.get(v.lower())
+        if canonical and canonical not in seen:
+            out.append(canonical)
+            seen.add(canonical)
+    return out
+
+
+def _restrict_to_vocabulary(spec: ParsedSpec, vocab: Vocabulary) -> None:
+    """Post-validate the LLM's output: drop any value not in the DB vocabulary.
+
+    Only applies to fields whose vocab we injected into the prompt. Skills and
+    function titles use fuzzy matching downstream and are left as-is here.
+    """
+    if spec.industry is not None:
+        spec.industry.values = _filter_to_known(spec.industry.values, vocab.industries)
+    if spec.languages is not None:
+        spec.languages.values = _filter_to_known(spec.languages.values, vocab.languages)
+        if spec.languages.required_proficiency is not None:
+            # Proficiency is a Literal enum in the Pydantic schema already; validate
+            # against vocab as a second line of defence.
+            if spec.languages.required_proficiency not in vocab.proficiency_levels:
+                spec.languages.required_proficiency = None  # type: ignore[assignment]
+
+
+def parse_query(
+    query: str,
+    llm: LLMClient,
+    vocab: Vocabulary | None = None,
+) -> ParsedSpec:
+    """Single structured LLM call. Returns a validated (and optionally
+    vocab-grounded) ParsedSpec.
+    """
+    system = SYSTEM_PROMPT
+    if vocab is not None:
+        system = system + "\n\n" + vocab.to_prompt_block()
+
+    spec = llm.chat_structured(
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system},
             {"role": "user",   "content": query},
         ],
         response_model=ParsedSpec,
         temperature=0.0,
-        max_tokens=800,
+        max_tokens=1200,  # a touch more headroom — the spec+vocab now uses more of the context
     )
+
+    if vocab is not None:
+        _restrict_to_vocabulary(spec, vocab)
+    return spec

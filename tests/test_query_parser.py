@@ -1,9 +1,10 @@
 from unittest.mock import MagicMock
 
 from app.models import (
-    DimensionSpec, GeoSpec, ParsedSpec, SenioritySpec, ViewWeights,
+    DimensionSpec, GeoSpec, LanguagesSpec, ParsedSpec, SenioritySpec, ViewWeights,
 )
 from app.query_parser import parse_query
+from app.vocabulary import Vocabulary
 
 
 def test_parse_pharma_middle_east_query_returns_parsed_spec():
@@ -36,6 +37,64 @@ def test_parse_empty_query_yields_default_temporality():
     llm.chat_structured.return_value = ParsedSpec(temporality="any")
     spec = parse_query("anyone", llm=llm)
     assert spec.temporality == "any"
+
+
+def test_parse_vocab_injection_appends_vocab_block_to_system_prompt():
+    llm = MagicMock()
+    llm.chat_structured.return_value = ParsedSpec(temporality="any")
+
+    vocab = Vocabulary(
+        industries=["Pharmaceuticals"],
+        skill_categories=["Engineering"],
+        languages=["Arabic"],
+        proficiency_levels=["Native"],
+        skills=[],
+    )
+    parse_query("find me X", llm=llm, vocab=vocab)
+
+    system_msg = llm.chat_structured.call_args.kwargs["messages"][0]["content"]
+    assert "Known DB vocabulary" in system_msg
+    assert "INDUSTRIES: Pharmaceuticals" in system_msg
+    assert "LANGUAGES: Arabic" in system_msg
+
+
+def test_parse_vocab_drops_unknown_industries_and_keeps_known():
+    llm = MagicMock()
+    llm.chat_structured.return_value = ParsedSpec(
+        industry=DimensionSpec(
+            values=["Pharmaceuticals", "Made-Up-Industry"], weight=0.3, required=False,
+        ),
+        languages=LanguagesSpec(
+            values=["English", "Klingon"], weight=0.1, required=False,
+        ),
+        temporality="any",
+    )
+    vocab = Vocabulary(
+        industries=["Pharmaceuticals", "Finance"],
+        skill_categories=[],
+        languages=["English", "Arabic"],
+        proficiency_levels=["Native", "Fluent"],
+        skills=[],
+    )
+
+    spec = parse_query("x", llm=llm, vocab=vocab)
+
+    assert spec.industry is not None and spec.industry.values == ["Pharmaceuticals"]
+    assert spec.languages is not None and spec.languages.values == ["English"]
+
+
+def test_parse_vocab_canonicalizes_case():
+    llm = MagicMock()
+    llm.chat_structured.return_value = ParsedSpec(
+        industry=DimensionSpec(values=["pharmaceuticals"], weight=0.3, required=False),
+        temporality="any",
+    )
+    vocab = Vocabulary(
+        industries=["Pharmaceuticals"], skill_categories=[],
+        languages=[], proficiency_levels=[], skills=[],
+    )
+    spec = parse_query("x", llm=llm, vocab=vocab)
+    assert spec.industry is not None and spec.industry.values == ["Pharmaceuticals"]
 
 
 def test_parse_temporality_past_for_former_role():
