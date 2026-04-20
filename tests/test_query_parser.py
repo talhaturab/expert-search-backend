@@ -1,7 +1,8 @@
 from unittest.mock import MagicMock
 
 from app.models import (
-    DimensionSpec, GeoSpec, LanguagesSpec, ParsedSpec, SenioritySpec, ViewWeights,
+    DimensionSpec, GeoSpec, LanguagesSpec, ParsedSpec, PriorContext,
+    SenioritySpec, ViewWeights,
 )
 from app.query_parser import parse_query
 from app.vocabulary import Vocabulary
@@ -106,3 +107,29 @@ def test_parse_temporality_past_for_former_role():
     spec = parse_query("former CPO at petrochemical company", llm=llm)
     assert spec.temporality == "past"
     assert spec.function is not None and spec.function.values == ["CPO"]
+
+
+def test_parser_without_prior_context_does_not_mention_refinement_block():
+    llm = MagicMock()
+    llm.chat_structured.return_value = ParsedSpec(temporality="any")
+    parse_query("find pharma experts", llm=llm)
+    system_msg = llm.chat_structured.call_args.kwargs["messages"][0]["content"]
+    assert "PRIOR TURN CONTEXT" not in system_msg
+    assert "REFINEMENT DETECTION" not in system_msg
+
+
+def test_parser_with_prior_context_injects_block_with_ids_and_prior_query():
+    llm = MagicMock()
+    llm.chat_structured.return_value = ParsedSpec(temporality="any", is_refinement=True)
+    prior = PriorContext(
+        prior_query="regulatory affairs in pharma in Middle East",
+        prior_parsed_spec=ParsedSpec(temporality="any"),
+        prior_suggested_ids=["abc-123", "def-456"],
+    )
+    spec = parse_query("filter those to only people in Saudi Arabia", llm=llm, prior_context=prior)
+    assert spec.is_refinement is True
+    system_msg = llm.chat_structured.call_args.kwargs["messages"][0]["content"]
+    assert "PRIOR TURN CONTEXT" in system_msg
+    assert "REFINEMENT DETECTION" in system_msg
+    assert "regulatory affairs in pharma in Middle East" in system_msg
+    assert "abc-123" in system_msg

@@ -7,7 +7,7 @@ downstream SQL lookups without any fuzzy post-matching.
 from __future__ import annotations
 
 from app.llm import LLMClient
-from app.models import ParsedSpec
+from app.models import ParsedSpec, PriorContext
 from app.vocabulary import Vocabulary
 
 
@@ -98,10 +98,29 @@ def _restrict_to_vocabulary(spec: ParsedSpec, vocab: Vocabulary) -> None:
                 spec.languages.required_proficiency = None  # type: ignore[assignment]
 
 
+def _render_prior_context_block(prior: PriorContext) -> str:
+    return (
+        "\n\nPRIOR TURN CONTEXT:\n"
+        f"- prior query: {prior.prior_query!r}\n"
+        f"- prior result candidate IDs: {prior.prior_suggested_ids}\n"
+        f"- prior parsed spec: {prior.prior_parsed_spec.model_dump(exclude_none=True)}\n"
+        "\nREFINEMENT DETECTION:\n"
+        "Set `is_refinement: true` ONLY if the new query narrows or filters the\n"
+        "prior result set (phrases like 'filter those to ...', 'among them, only ...',\n"
+        "'narrow to ...', 'from those, only ...'). A brand-new search that happens to\n"
+        "share a topic is NOT a refinement.\n"
+        "\n"
+        "If `is_refinement: true`, produce a ParsedSpec containing ONLY the NEW\n"
+        "constraints the user is adding. Do NOT re-emit the prior spec's constraints —\n"
+        "the search will restrict to the prior candidate pool."
+    )
+
+
 def parse_query(
     query: str,
     llm: LLMClient,
     vocab: Vocabulary | None = None,
+    prior_context: PriorContext | None = None,
 ) -> ParsedSpec:
     """Single structured LLM call. Returns a validated (and optionally
     vocab-grounded) ParsedSpec.
@@ -109,6 +128,8 @@ def parse_query(
     system = SYSTEM_PROMPT
     if vocab is not None:
         system = system + "\n\n" + vocab.to_prompt_block()
+    if prior_context is not None:
+        system = system + _render_prior_context_block(prior_context)
 
     spec = llm.chat_structured(
         messages=[
