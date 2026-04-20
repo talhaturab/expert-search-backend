@@ -95,30 +95,78 @@ def fetch_candidate_bundle(dsn: str, candidate_id: str) -> dict:
             }
 
 
+# ---------------------------------------------------------------------------
+# Bulk versions of the per-candidate queries — fetch EVERYTHING in one round-trip
+# then group by candidate_id in Python. Avoids the N+1 problem.
+# ---------------------------------------------------------------------------
+
+_BULK_WORK_SQL = WORK_SQL.replace(
+    "WHERE we.candidate_id = %s\nORDER BY we.is_current DESC, we.start_date DESC",
+    "ORDER BY we.candidate_id, we.is_current DESC, we.start_date DESC",
+)
+_BULK_EDUCATION_SQL = EDUCATION_SQL.replace(
+    "WHERE e.candidate_id = %s\nORDER BY e.graduation_year DESC NULLS LAST",
+    "ORDER BY e.candidate_id, e.graduation_year DESC NULLS LAST",
+)
+_BULK_SKILLS_SQL = SKILLS_SQL.replace(
+    "WHERE cs.candidate_id = %s\nORDER BY cs.years_of_experience DESC NULLS LAST, s.name",
+    "ORDER BY cs.candidate_id, cs.years_of_experience DESC NULLS LAST, s.name",
+)
+_BULK_LANGUAGES_SQL = LANGUAGES_SQL.replace(
+    "WHERE cl.candidate_id = %s\nORDER BY pl.rank DESC, l.name",
+    "ORDER BY cl.candidate_id, pl.rank DESC, l.name",
+)
+
+# The bulk queries still need candidate_id in the SELECT so we can group afterward.
+for _before, _after in [
+    ("SELECT we.job_title,",       "SELECT we.candidate_id, we.job_title,"),
+    ("SELECT e.start_year,",       "SELECT e.candidate_id, e.start_year,"),
+    ("SELECT s.name AS skill,",    "SELECT cs.candidate_id, s.name AS skill,"),
+    ("SELECT l.name AS language,", "SELECT cl.candidate_id, l.name AS language,"),
+]:
+    _BULK_WORK_SQL      = _BULK_WORK_SQL.replace(_before, _after, 1)
+    _BULK_EDUCATION_SQL = _BULK_EDUCATION_SQL.replace(_before, _after, 1)
+    _BULK_SKILLS_SQL    = _BULK_SKILLS_SQL.replace(_before, _after, 1)
+    _BULK_LANGUAGES_SQL = _BULK_LANGUAGES_SQL.replace(_before, _after, 1)
+
+
+def _bulk(cur, sql: str) -> dict[str, list[dict]]:
+    """Run a bulk query and group rows by candidate_id (popping the key from each row)."""
+    cur.execute(sql)
+    out: dict[str, list[dict]] = {}
+    for row in cur.fetchall():
+        row = dict(row)
+        cid = str(row.pop("candidate_id"))
+        out.setdefault(cid, []).append(row)
+    return out
+
+
 def fetch_all_bundles(dsn: str, limit: int | None = None) -> list[dict]:
-    """All (or first N) candidates with full bundles. Used by the offline indexer.
+    """All (or first N) candidates with full bundles, in 5 round-trips total.
 
-    Streams one connection; N+1 queries per candidate but runs once offline.
-    Total ~50k queries over a persistent connection for the full 10K set.
-
-    Args:
-        dsn: Postgres connection string.
-        limit: Optional cap on number of candidates to load. None = all.
+    1 query for the enriched candidate list, then 4 bulk queries for work /
+    education / skills / languages. Rows grouped by candidate_id in Python.
+    Replaces the old 4×N N+1 loop (which stalled at 40K queries).
     """
     candidates = fetch_all_candidates(dsn)
     if limit is not None:
         candidates = candidates[:limit]
 
-    results: list[dict] = []
     with psycopg2.connect(dsn) as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            for c in candidates:
-                cid = str(c["id"])
-                results.append({
-                    "candidate": c,
-                    "work":      _run(cur, WORK_SQL,      (cid,)),
-                    "education": _run(cur, EDUCATION_SQL, (cid,)),
-                    "skills":    _run(cur, SKILLS_SQL,    (cid,)),
-                    "languages": _run(cur, LANGUAGES_SQL, (cid,)),
-                })
-    return results
+            work_by_cid      = _bulk(cur, _BULK_WORK_SQL)
+            education_by_cid = _bulk(cur, _BULK_EDUCATION_SQL)
+            skills_by_cid    = _bulk(cur, _BULK_SKILLS_SQL)
+            languages_by_cid = _bulk(cur, _BULK_LANGUAGES_SQL)
+
+    bundles: list[dict] = []
+    for c in candidates:
+        cid = str(c["id"])
+        bundles.append({
+            "candidate": c,
+            "work":      work_by_cid.get(cid, []),
+            "education": education_by_cid.get(cid, []),
+            "skills":    skills_by_cid.get(cid, []),
+            "languages": languages_by_cid.get(cid, []),
+        })
+    return bundles
