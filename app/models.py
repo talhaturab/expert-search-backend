@@ -67,6 +67,19 @@ class CandidateResult(BaseModel):
     per_dim: dict[str, float] | None = None  # populated only for det_picks
 
 
+class JudgePick(BaseModel):
+    """Judge's per-candidate output. Minimal — scores come from the source agent."""
+    candidate_id: str
+    match_explanation: str
+    highlights: list[str] = Field(default_factory=list)
+
+
+class JudgeDecision(BaseModel):
+    """Structured LLM output for the judge: 5 cherry-picked candidates + rationale."""
+    suggested: list[JudgePick]
+    reasoning: str
+
+
 class RerankPick(BaseModel):
     """Structured LLM output for a single-candidate pointwise rerank call.
 
