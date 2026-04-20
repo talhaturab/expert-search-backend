@@ -24,6 +24,7 @@ openrouter_protected.zip
 # Vector store & runtime data
 data/
 exploration/
+evaluation_testing/
 chroma/
 *.sqlite3
 
