@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expert Search</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" href="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f46e5' stroke-width='2.5' stroke-linecap='round'&gt;&lt;circle cx='11' cy='11' r='8'/&gt;&lt;path d='m21 21-4.35-4.35'/&gt;&lt;/svg&gt;" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm10 2-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="brand-name">Expert Search</span>
+    </div>
+    <div class="status-row" id="statusRow">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span class="status-text">Checking…</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1 class="hero-title">Find subject-matter experts.</h1>
+      <p class="hero-sub">Describe who you need in plain English. Two agents search in parallel — semantic (RAG) and structured (SQL scoring) — and a judge cherry-picks the final five.</p>
+
+      <form class="search-form" id="searchForm" autocomplete="off">
+        <div class="search-input-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm10 2-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <input
+            id="queryInput"
+            class="search-input"
+            type="text"
+            name="query"
+            placeholder='e.g. "Regulatory affairs experts in pharma in the Middle East"'
+            spellcheck="false"
+            required
+          />
+          <button type="submit" class="search-submit" id="searchSubmit">
+            <span class="submit-label">Search</span>
+            <kbd class="kbd">⌘⏎</kbd>
+          </button>
+        </div>
+      </form>
+
+      <div class="examples">
+        <span class="examples-label">Try:</span>
+        <button class="example-pill" data-query="Regulatory affairs experts in pharma in the Middle East">Regulatory affairs · pharma · ME</button>
+        <button class="example-pill" data-query="Former CPO at a Saudi petrochemical company">Former CPO · Saudi petrochem</button>
+        <button class="example-pill" data-query="Senior data scientists in fintech based in the UK, fluent in English">Data scientist · fintech · UK</button>
+        <button class="example-pill" data-query="Software engineers with 5+ years of Python experience in Berlin">Python engineers · Berlin</button>
+      </div>
+    </section>
+
+    <section id="results" class="results" hidden>
+      <div class="loader" id="loader" hidden>
+        <div class="loader-spinner"></div>
+        <div class="loader-text">
+          <div class="loader-title">Searching across 10,120 experts…</div>
+          <div class="loader-stages" id="loaderStages">
+            <span class="stage active">Parsing query</span>
+            <span class="stage-sep">→</span>
+            <span class="stage">RAG + Deterministic (parallel)</span>
+            <span class="stage-sep">→</span>
+            <span class="stage">Judge cherry-picks top 5</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="error-card" id="errorCard" hidden>
+        <strong>Search failed.</strong>
+        <span id="errorText"></span>
+      </div>
+
+      <div class="results-body" id="resultsBody" hidden>
+
+        <!-- Parsed spec -->
+        <article class="card card-spec" id="specCard">
+          <header class="card-head">
+            <h2 class="card-title">Parsed query</h2>
+            <span class="card-sub">what the parser extracted &amp; how it weighted each signal</span>
+          </header>
+          <div class="card-body" id="specBody"></div>
+        </article>
+
+        <!-- Judge's final picks -->
+        <article class="card card-final">
+          <header class="card-head">
+            <div>
+              <h2 class="card-title">
+                <span class="emoji">🏆</span> Final picks
+                <span class="card-tag card-tag-judge">Judge</span>
+              </h2>
+              <span class="card-sub">cherry-picked from both agents by a single LLM call — click any row for the full profile</span>
+            </div>
+          </header>
+          <div class="card-body" id="suggestedBody"></div>
+        </article>
+
+        <!-- Judge reasoning -->
+        <article class="card card-reasoning" id="reasoningCard">
+          <header class="card-head">
+            <h2 class="card-title">Judge reasoning</h2>
+          </header>
+          <div class="card-body">
+            <p class="reasoning-text" id="reasoningText"></p>
+          </div>
+        </article>
+
+        <!-- Two-column: RAG + Det -->
+        <div class="columns">
+          <article class="card card-agent">
+            <header class="card-head">
+              <div>
+                <h2 class="card-title">
+                  RAG picks
+                  <span class="card-tag card-tag-rag">Semantic</span>
+                </h2>
+                <span class="card-sub">hybrid cosine + BM25 · RRF · parallel LLM rerank</span>
+              </div>
+            </header>
+            <div class="card-body" id="ragBody"></div>
+          </article>
+
+          <article class="card card-agent">
+            <header class="card-head">
+              <div>
+                <h2 class="card-title">
+                  Deterministic picks
+                  <span class="card-tag card-tag-det">Structured</span>
+                </h2>
+                <span class="card-sub">6 explicit dims · weighted sum · zero LLM</span>
+              </div>
+            </header>
+            <div class="card-body" id="detBody"></div>
+          </article>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- Profile drawer -->
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-scrim" id="drawerScrim"></div>
+    <div class="drawer-panel" role="dialog" aria-labelledby="drawerTitle">
+      <header class="drawer-head">
+        <div>
+          <span class="drawer-eyebrow">Candidate profile</span>
+          <h3 class="drawer-title" id="drawerTitle">—</h3>
+        </div>
+        <button class="drawer-close" id="drawerClose" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+      <div class="drawer-body" id="drawerBody">
+        <div class="drawer-loader">Loading…</div>
+      </div>
+    </div>
+  </aside>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
