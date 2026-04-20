@@ -4,6 +4,7 @@ from app.chroma_store import ChromaStore
 from app.config import get_settings
 from app.ingest import build_index
 from app.models import IngestRequest, IngestResponse
+from app.routes.chat import invalidate_search_service
 
 
 router = APIRouter()
@@ -26,4 +27,6 @@ def ingest(req: IngestRequest) -> IngestResponse:
         store=store,
         limit=s.ingest_limit,
     )
+    # Chroma was rebuilt — any cached SearchService now holds stale vectors.
+    invalidate_search_service()
     return IngestResponse(**result)

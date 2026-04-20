@@ -10,7 +10,7 @@ def settings(monkeypatch, tmp_path) -> Settings:
     monkeypatch.setenv("DATABASE_URL", "postgresql://developer:devread2024@34.79.32.228:5432/candidate_profiles")
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
     monkeypatch.setenv("CHROMA_PERSIST_PATH", str(tmp_path / "chroma"))
-    return Settings()
+    return Settings(_env_file=None)  # isolate from the repo's .env
 
 
 @pytest.fixture
