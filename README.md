@@ -135,8 +135,8 @@ Each is embedded separately → 30K vectors in one Chroma collection with metada
     - Aggregate per candidate using `view_weights` (query-weighted sum; `max` fallback)
     - **Reciprocal Rank Fusion** over vector & BM25 ranks (k=60, no normalization needed)
     - Take top-50 → parallel pointwise LLM rerank (one call per candidate via ThreadPoolExecutor, 16 workers) → sort by LLM score → top 5
-3. **Deterministic agent** (WIP): 6 dimension scoring functions, hard-filter pool, weighted sum → top 5
-4. **Judge** (WIP): one LLM call seeing both lists, cherry-picks the final 5
+3. **Deterministic agent**: 6 dimension scoring functions, hard-filter pool, weighted sum → top 5
+4. **Judge**: one LLM call seeing both lists, cherry-picks the final 5
 
 ### Model choice — LLM
 
@@ -190,6 +190,30 @@ docs/superpowers/plans/   # Implementation plan
 
 ---
 
+## Conversational context
+
+Follow-up queries can reference prior results via `conversation_id`:
+
+```bash
+# First turn — server returns a conversation_id in the response
+curl -s -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "regulatory affairs experts in pharma in the Middle East"}' \
+  | jq '{conversation_id, suggested}'
+
+# Second turn — reuse the conversation_id to narrow the prior result set
+curl -s -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "filter those to only people in Saudi Arabia", "conversation_id": "<paste from above>"}' \
+  | jq '{is_refinement, suggested}'
+```
+
+The second call takes the prior turn's `suggested` candidates (up to 5) and re-scores them against the new constraint instead of running a fresh full-scan search. Sessions live 30 minutes in-memory and are lost on process restart.
+
+Only **narrowing** follow-ups are supported in this iteration (*"filter those to..."*, *"among them, only..."*, *"narrow to..."*). Broadening follow-ups (*"show me more like these"*) and explanation questions (*"why did you pick #3?"*) are not.
+
+---
+
 ## Testing
 
 ```bash
@@ -204,6 +228,6 @@ poetry run pytest -v -m integration
 
 ## Out of scope for this iteration
 
-- **Conversational context** (follow-up queries like *"Filter those to Saudi only"*). The `ChatRequest` schema accepts `conversation_id` but it's currently a no-op; deferred.
 - **Evaluation & Precision design doc** (Part 3 of the brief) — written deliverable, intentionally deferred for a later iteration.
 - **HyDE** (hypothetical document embeddings at query time) — the `HYDE_ENABLED` flag exists in `.env` but the step is not wired into `SearchService`. Easy to add later if retrieval quality on vague queries proves insufficient.
+- **Broadening / explanation follow-ups** in conversation context — narrow-refinement only.
