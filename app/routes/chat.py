@@ -23,6 +23,7 @@ from app.models import ChatRequest, ChatResponse
 from app.query_parser import parse_query
 from app.rag_agent import rerank_and_explain
 from app.search import SearchService
+from app.session_store import SessionStore
 from app.vocabulary import load_vocabulary
 
 
@@ -71,8 +72,13 @@ def get_search_service() -> SearchService:
         # Fallback — the judge may receive an id that isn't in the indexed set.
         return fetch_candidate_bundle(s.database_url, cid)
 
+    session_store = SessionStore(ttl_seconds=1800)
+
+    def _det_on_pool(pool_bundles: list[dict], spec, top_k: int = 5):
+        return filter_and_score(pool_bundles, spec, top_k=top_k)
+
     return SearchService(
-        parse_query=lambda q: parse_query(q, llm=llm, vocab=vocab),
+        parse_query=lambda q, prior_context=None: parse_query(q, llm=llm, vocab=vocab, prior_context=prior_context),
         embed_query=lambda t: embedder.embed_one(t),
         all_embeddings=embs,
         candidate_ids=candidate_ids_in_order,
@@ -80,12 +86,14 @@ def get_search_service() -> SearchService:
         rag_rerank=lambda q, pool: rerank_and_explain(
             q, pool, llm=llm, top_k=s.final_top_k
         ),
-        run_deterministic=lambda spec: filter_and_score(
+        run_deterministic=lambda spec: _det_on_pool(
             all_bundles, spec, top_k=s.deterministic_top_k
         ),
+        run_deterministic_on_pool=_det_on_pool,
         judge=lambda q, rp, dp, pm: cherry_pick_top_five(q, rp, dp, pm, llm=llm),
         fetch_bundle=_fetch_bundle,
         rag_top_k=s.rag_top_k,
+        session_store=session_store,
     )
 
 
@@ -97,4 +105,4 @@ def invalidate_search_service() -> None:
 @router.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest) -> ChatResponse:
     service = get_search_service()
-    return service.search(req.query)
+    return service.search(req.query, conversation_id=req.conversation_id)

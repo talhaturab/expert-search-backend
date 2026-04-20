@@ -18,7 +18,7 @@ def test_chat_returns_full_response(monkeypatch, tmp_path):
 
     fake_svc = MagicMock()
     fake_svc.search.return_value = ChatResponse(
-        query="pharma",
+        query="pharma", conversation_id="auto-generated-cid",
         parsed_spec=ParsedSpec(temporality="any"),
         rag_picks=[CandidateResult(candidate_id="c1", rank=1, score=85,
                                    match_explanation="rag", highlights=["x"])],
@@ -41,19 +41,38 @@ def test_chat_returns_full_response(monkeypatch, tmp_path):
     assert body["det_picks"][0]["per_dim"] == {"industry": 1.0}
     assert len(body["suggested"]) == 1
     assert body["reasoning"] == "agreement on c1"
-    fake_svc.search.assert_called_once_with("pharma")
+    assert body["conversation_id"] == "auto-generated-cid"
+    fake_svc.search.assert_called_once_with("pharma", conversation_id=None)
 
 
-def test_chat_accepts_conversation_id_noop(monkeypatch, tmp_path):
+def test_chat_threads_conversation_id_through_to_search(monkeypatch, tmp_path):
     _base_env(monkeypatch, tmp_path)
     client = TestClient(create_app())
     fake_svc = MagicMock()
     fake_svc.search.return_value = ChatResponse(
-        query="q", parsed_spec=ParsedSpec(temporality="any"),
+        query="q", conversation_id="c-123",
+        parsed_spec=ParsedSpec(temporality="any"),
         rag_picks=[], det_picks=[], suggested=[], reasoning="",
     )
     with patch("app.routes.chat.get_search_service", return_value=fake_svc):
         r = client.post("/chat", json={"query": "q", "conversation_id": "c-123"})
     assert r.status_code == 200
-    # conversation_id is schema-valid but not yet used — search still runs
-    fake_svc.search.assert_called_once_with("q")
+    fake_svc.search.assert_called_once_with("q", conversation_id="c-123")
+
+
+def test_chat_response_echoes_conversation_id_and_marks_refinement(monkeypatch, tmp_path):
+    _base_env(monkeypatch, tmp_path)
+    client = TestClient(create_app())
+    fake_svc = MagicMock()
+    fake_svc.search.return_value = ChatResponse(
+        query="q", conversation_id="cid-xyz", is_refinement=True,
+        parsed_spec=ParsedSpec(temporality="any"),
+        rag_picks=[], det_picks=[], suggested=[], reasoning="",
+    )
+    with patch("app.routes.chat.get_search_service", return_value=fake_svc):
+        r = client.post("/chat", json={"query": "q", "conversation_id": "cid-xyz"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["conversation_id"] == "cid-xyz"
+    assert body["is_refinement"] is True
+    fake_svc.search.assert_called_once_with("q", conversation_id="cid-xyz")
