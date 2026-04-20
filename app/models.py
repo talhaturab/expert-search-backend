@@ -102,6 +102,8 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     query: str
+    conversation_id: str = ""
+    is_refinement: bool = False
     parsed_spec: ParsedSpec
     rag_picks: list[CandidateResult]
     det_picks: list[CandidateResult]
