@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.routes import chat as chat_routes
+from app.routes import experts as experts_routes
 from app.routes import health as health_routes
 from app.routes import ingest as ingest_routes
 
@@ -10,6 +11,7 @@ def create_app() -> FastAPI:
     app.include_router(health_routes.router)
     app.include_router(ingest_routes.router)
     app.include_router(chat_routes.router)
+    app.include_router(experts_routes.router)
     return app
 
 
