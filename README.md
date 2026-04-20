@@ -102,7 +102,9 @@ Returns:
 
 ## Design summary
 
-Full spec: [`docs/superpowers/specs/2026-04-20-expert-search-design.md`](docs/superpowers/specs/2026-04-20-expert-search-design.md).
+- Approved design spec: [`docs/superpowers/specs/2026-04-20-expert-search-design.md`](docs/superpowers/specs/2026-04-20-expert-search-design.md)
+- Conversation-context addition: [`docs/superpowers/specs/2026-04-21-conversation-context-design.md`](docs/superpowers/specs/2026-04-21-conversation-context-design.md)
+- **Part 3 — Evaluation & Precision Thinking** (brief's written deliverable): [`docs/PART_3_EVALUATION.md`](docs/PART_3_EVALUATION.md)
 
 ### Vector database choice — **Chroma** (SQLite-backed, local)
 
@@ -228,6 +230,5 @@ poetry run pytest -v -m integration
 
 ## Out of scope for this iteration
 
-- **Evaluation & Precision design doc** (Part 3 of the brief) — written deliverable, intentionally deferred for a later iteration.
 - **HyDE** (hypothetical document embeddings at query time) — the `HYDE_ENABLED` flag exists in `.env` but the step is not wired into `SearchService`. Easy to add later if retrieval quality on vague queries proves insufficient.
 - **Broadening / explanation follow-ups** in conversation context — narrow-refinement only.
