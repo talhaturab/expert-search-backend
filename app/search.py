@@ -47,6 +47,11 @@ class SearchService:
     rag_top_k: int = 50
 
     session_store: SessionStore = field(default_factory=lambda: SessionStore(ttl_seconds=1800))
+    
+    orchestrator_agent = Agent(
+        Tools = [search_tool, evaluate_tool],
+        system_prompt = ORCHESTRATOR_SYSTEM_PROMPT,
+    )
 
     def search(self, query: str, conversation_id: str | None = None) -> ChatResponse:
         cid = conversation_id or _new_conversation_id()

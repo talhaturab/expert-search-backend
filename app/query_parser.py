@@ -55,6 +55,9 @@ Temporality:
 - "currently [role]" / "now [role]" -> "current"
 - Otherwise -> "any"
 
+Mandatory:
+- You should always extract the exact skills/tools mentioned by candidate-search query 
+
 CUSTOM WEIGHTING HEURISTICS (user-supplied — fill in with domain rules):
 # TODO: user writes 5–10 if-then rules here. Examples:
 # - If query mentions "junior" / "entry-level" / "new grad":

@@ -13,6 +13,9 @@ from app.scoring import (
     score_languages, score_seniority, score_skills,
 )
 
+from app.llm_client import client, mod_skills
+from app.system_prompt import SKILL_EXPANSION_TEMPLATE
+
 
 DIM_NAMES = ("function", "industry", "geography", "seniority", "skills", "languages")
 
@@ -134,6 +137,38 @@ def build_highlights(bundle: dict, spec: ParsedSpec) -> list[str]:
 
     return out[:4]
 
+from pydantic import BaseModel, Field
+from typing import List
+
+class mod_skills(BaseModel):
+    skills: List[str] = Field(description="list of application skills")
+
+def get_modified_spec(spec: ParsedSpec) -> ParsedSpec:
+    skills = spec.skills.values if spec.skills else []
+    response = client.responses.parse(
+    model="openai/gpt-5.4",
+    input=[
+        {
+            "role": "system",
+            "content": SKILL_EXPANSION_TEMPLATE.render(),
+        },
+        {
+            "role": "user",
+            "content": "Expand the following skills into more specific technical skills: " + ", ".join(skills) if skills else "No skills provided.",
+        },
+    ],
+    text_format=mod_skills,
+    )
+    
+    event = response.output_parsed
+    modified_skills = event.skills
+    
+    print('---****---')
+    print ("Original skills:", skills)
+    print ("Modified skills:", modified_skills)
+    print('---****---')
+    
+    return modified_skills
 
 def filter_and_score(
     bundles: list[dict],
@@ -142,6 +177,10 @@ def filter_and_score(
 ) -> list[CandidateResult]:
     """Main entry point. Hard-filter → score every remaining candidate → top_k."""
     weights = _weights(spec)
+    
+    # Here we will enrich the spec with LLM-suggested modifications before scoring, if any.
+    modified_skills = get_modified_spec(spec)
+    spec.skills.values = modified_skills
 
     scored: list[tuple[float, dict, dict[str, float]]] = []
     for b in bundles:

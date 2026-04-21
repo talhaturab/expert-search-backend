@@ -21,6 +21,22 @@ def _trgm_sim(a: str, b: str) -> float:
     return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
 
+def _word_subset(a: str, b: str) -> bool:
+    """True if every word in `a` appears as a whole word in `b` (case-insensitive).
+
+    Catches length-asymmetric matches that trigram similarity misses:
+    ("Security", "Security Assurance") → True.  ("AI", "AIDS") → False because
+    "AIDS" is a single word, not a word containing "AI".
+
+    Also catches seniority-prefix cases: ("Data Scientist", "Senior Data
+    Scientist") → True, which trigram alone scores ~0.83 — the same value as
+    genuinely-different pairs like ("QA Engineer", "Data Engineer").
+    """
+    a_words = a.lower().split()
+    b_words = set(b.lower().split())
+    return bool(a_words) and all(w in b_words for w in a_words)
+
+
 def _years_of(job: dict) -> float:
     start = job.get("start_date")
     end = job.get("end_date") or dt.date.today()
@@ -31,8 +47,46 @@ def _years_of(job: dict) -> float:
 
 # ---------- Function ----------
 
+# Role-suffix words that appear at the end of many different job titles and
+# therefore don't identify a function on their own. "QA Engineer" and "Data
+# Engineer" both contain "engineer" — that overlap shouldn't count as a match.
+_GENERIC_TITLE_WORDS = frozenset({
+    "engineer", "manager", "analyst", "developer", "specialist",
+    "administrator", "coordinator", "consultant", "director",
+    "officer", "executive", "associate", "representative", "agent",
+    "assistant", "scientist",
+})
+
+
+def _function_similarity(target: str, title: str) -> float:
+    """Similarity score in [0, 1] between a target function and a title.
+
+    Three tiers:
+    1. Word-subset match (target ⊂ title or vice versa) → 1.0. Handles the
+       common case of a generic target ("Frontend Developer") vs a seniority-
+       qualified title ("Senior Frontend Developer").
+    2. If the target has content words (non-generic suffixes) but none overlap
+       with the candidate, treat as a false-positive trigram match and cap at
+       0.5. Prevents "Data Engineer" scoring 0.83 against "QA Engineer" just
+       because they share the generic word "Engineer".
+    3. Otherwise return trigram similarity (preserves typo tolerance).
+    """
+    if not target or not title:
+        return 0.0
+    if _word_subset(target, title) or _word_subset(title, target):
+        return 1.0
+
+    t_content = set(target.lower().split()) - _GENERIC_TITLE_WORDS
+    c_content = set(title.lower().split()) - _GENERIC_TITLE_WORDS
+    if t_content and not (t_content & c_content):
+        # High character overlap but no shared non-generic word — cap hard.
+        return min(_trgm_sim(target, title), 0.5)
+
+    return _trgm_sim(target, title)
+
+
 def score_function(bundle: dict, spec: DimensionSpec) -> float:
-    """Best fuzzy title/headline match × recency weight."""
+    """Best title/headline match × recency weight."""
     if not spec.values:
         return 0.0
     titles_with_recency: list[tuple[str, float]] = []
@@ -52,7 +106,7 @@ def score_function(bundle: dict, spec: DimensionSpec) -> float:
     best = 0.0
     for target in spec.values:
         for title, rec in titles_with_recency:
-            sim = _trgm_sim(target, title) * rec
+            sim = _function_similarity(target, title) * rec
             if sim > best:
                 best = sim
     return min(best, 1.0)
@@ -155,18 +209,6 @@ def score_seniority(bundle: dict, spec: SenioritySpec) -> float:
 # into the parser prompt. Instead we match each LLM-emitted target skill against
 # the candidate's actual skills with exact + word-subset + trigram fallback.
 _SKILL_FUZZY_THRESHOLD = 0.80
-
-
-def _word_subset(a: str, b: str) -> bool:
-    """True if every word in `a` appears as a whole word in `b` (case-insensitive).
-
-    Catches length-asymmetric matches that trigram similarity misses:
-    ("Security", "Security Assurance") → True.  ("AI", "AIDS") → False because
-    "AIDS" is a single word, not a word containing "AI".
-    """
-    a_words = a.lower().split()
-    b_words = set(b.lower().split())
-    return bool(a_words) and all(w in b_words for w in a_words)
 
 
 def _best_fuzzy_match(target: str, candidate_skills: dict[str, int]) -> tuple[str, int] | None:

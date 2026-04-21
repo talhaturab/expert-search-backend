@@ -358,8 +358,8 @@ function dimGlyphFor(score) {
   return '✗';
 }
 function dimLabel(d) {
-  return { function: 'Func', industry: 'Ind', geography: 'Geo',
-           seniority: 'Sr', skills: 'Skill', languages: 'Lang' }[d] || d;
+  return { function: 'Function', industry: 'Industry', geography: 'Geography',
+           seniority: 'Seniority', skills: 'Skills', languages: 'Languages' }[d] || d;
 }
 
 function renderDet(picks, spec) {
