@@ -60,11 +60,24 @@ def score_function(bundle: dict, spec: DimensionSpec) -> float:
 
 # ---------- Industry ----------
 
+# Someone currently in the target industry is a stronger "find-me-someone-at-X"
+# signal than tenure fraction alone — a recent switcher currently at a pharma
+# company should outrank a 20-year pharma veteran who just moved to fintech.
+# 0.7 is high enough to lift currently-in-target candidates into contention
+# without overwhelming a 100% tenure match.
+_CURRENT_ROLE_INDUSTRY_FLOOR = 0.7
+
+
 def score_industry(bundle: dict, spec: DimensionSpec) -> float:
-    """Fraction of career years spent in matching industries."""
+    """Industry match = max(current-role floor, tenure fraction).
+
+    - Currently in a target industry → score ≥ 0.7 regardless of tenure.
+    - Otherwise → fraction of career years in target industries.
+    """
     if not spec.values:
         return 0.0
     targets = {t.lower() for t in spec.values}
+
     total = 0.0
     matched = 0.0
     for w in bundle.get("work", []):
@@ -72,9 +85,12 @@ def score_industry(bundle: dict, spec: DimensionSpec) -> float:
         total += y
         if (w.get("industry") or "").lower() in targets:
             matched += y
-    if total <= 0:
-        return 0.0
-    return min(matched / total, 1.0)
+    tenure = min(matched / total, 1.0) if total > 0 else 0.0
+
+    current = next((w for w in bundle.get("work", []) if w.get("is_current")), None)
+    if current and (current.get("industry") or "").lower() in targets:
+        return max(_CURRENT_ROLE_INDUSTRY_FLOOR, tenure)
+    return tenure
 
 
 # ---------- Geography ----------
@@ -137,13 +153,33 @@ def score_seniority(bundle: dict, spec: SenioritySpec) -> float:
 
 # Skills is a big-vocab field (1,551 distinct values) — we don't inject the list
 # into the parser prompt. Instead we match each LLM-emitted target skill against
-# the candidate's actual skills with exact + trigram fuzzy fallback.
+# the candidate's actual skills with exact + word-subset + trigram fallback.
 _SKILL_FUZZY_THRESHOLD = 0.80
 
 
+def _word_subset(a: str, b: str) -> bool:
+    """True if every word in `a` appears as a whole word in `b` (case-insensitive).
+
+    Catches length-asymmetric matches that trigram similarity misses:
+    ("Security", "Security Assurance") → True.  ("AI", "AIDS") → False because
+    "AIDS" is a single word, not a word containing "AI".
+    """
+    a_words = a.lower().split()
+    b_words = set(b.lower().split())
+    return bool(a_words) and all(w in b_words for w in a_words)
+
+
 def _best_fuzzy_match(target: str, candidate_skills: dict[str, int]) -> tuple[str, int] | None:
-    """Return (candidate_skill_name, years) of the best trigram match above
-    threshold, or None if no candidate skill is close enough."""
+    """Return (candidate_skill_name, years) of the best match, or None.
+
+    Precedence: word-subset containment > trigram similarity. Word-subset catches
+    short-target / long-candidate cases like "Security" ⊂ "Security Assurance"
+    that trigram (ratio 0.62) rejects against our 0.80 threshold.
+    """
+    for name in candidate_skills:
+        if _word_subset(target, name) or _word_subset(name, target):
+            return name, candidate_skills[name]
+
     best, best_score = None, 0.0
     for name in candidate_skills:
         s = _trgm_sim(target, name)

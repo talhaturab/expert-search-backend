@@ -95,6 +95,102 @@ def test_score_skills_no_match_returns_zero(bundle_pharma_regulatory_uae):
     assert score_skills(bundle_pharma_regulatory_uae, spec) == 0.0
 
 
+def test_score_skills_short_target_matches_longer_candidate_skill():
+    """Short LLM target ("Security") should match a longer candidate skill
+    ("Security Assurance") via word-subset. Trigram similarity (0.62) alone
+    fails against the 0.80 threshold."""
+    bundle = {
+        "candidate": {"id": "c-sec", "first_name": "Hassan", "last_name": "Patel"},
+        "work": [],
+        "skills": [
+            {"skill": "Security Assurance", "years_of_experience": 12, "proficiency_level": "Beginner"},
+        ],
+    }
+    spec = SkillsSpec(values=["Security"], weight=0.2, required=False)
+    assert score_skills(bundle, spec) > 0.6
+
+
+def test_score_skills_word_subset_does_not_create_false_positives():
+    """"AI" should NOT match "AIDS" — word-subset only accepts whole-word
+    containment, so "AI" ⊂ "AIDS" is false."""
+    bundle = {
+        "candidate": {"id": "c-ai", "first_name": "x", "last_name": "y"},
+        "work": [],
+        "skills": [{"skill": "AIDS", "years_of_experience": 1, "proficiency_level": "Beginner"}],
+    }
+    spec = SkillsSpec(values=["AI"], weight=0.1, required=False)
+    assert score_skills(bundle, spec) == 0.0
+
+
+def test_score_industry_current_role_floor_for_career_switcher():
+    """Someone currently in a target industry should score >= 0.7 even if most
+    of their career was elsewhere. This is the "find me someone at a pharma
+    company right now" case — recency > lifetime tenure."""
+    bundle = {
+        "candidate": {"id": "c-switch", "first_name": "x", "last_name": "y",
+                      "years_of_experience": 15},
+        "work": [
+            # 2 years in target industry (current)
+            {"job_title": "Data Scientist", "is_current": True,
+             "start_date": dt.date(2024, 1, 1), "end_date": None,
+             "company": "Pfizer", "industry": "Pharmaceuticals",
+             "company_country_code": "US"},
+            # 13 years in a different industry
+            {"job_title": "Engineer", "is_current": False,
+             "start_date": dt.date(2011, 1, 1), "end_date": dt.date(2024, 1, 1),
+             "company": "Ford", "industry": "Automotive",
+             "company_country_code": "US"},
+        ],
+        "skills": [], "languages": [],
+    }
+    spec = DimensionSpec(values=["Pharmaceuticals"], weight=0.3, required=False)
+    score = score_industry(bundle, spec)
+    # Old behaviour: 2/15 ≈ 0.13. New behaviour: max(0.7, 0.13) = 0.7.
+    assert score >= 0.7
+
+
+def test_score_industry_full_tenure_still_scores_one():
+    """Regression: lifetime pharma veteran must still score 1.0, not be
+    capped by the current-role floor."""
+    bundle = {
+        "candidate": {"id": "c-vet", "first_name": "x", "last_name": "y",
+                      "years_of_experience": 20},
+        "work": [
+            {"job_title": "Director", "is_current": True,
+             "start_date": dt.date(2010, 1, 1), "end_date": None,
+             "company": "Pfizer", "industry": "Pharmaceuticals",
+             "company_country_code": "US"},
+        ],
+        "skills": [], "languages": [],
+    }
+    spec = DimensionSpec(values=["Pharmaceuticals"], weight=0.3, required=False)
+    assert score_industry(bundle, spec) == pytest.approx(1.0, abs=0.01)
+
+
+def test_score_industry_not_currently_in_target_uses_tenure():
+    """Not currently in target industry → pure tenure fraction, no floor."""
+    bundle = {
+        "candidate": {"id": "c-ex", "first_name": "x", "last_name": "y",
+                      "years_of_experience": 10},
+        "work": [
+            # 2 years in non-target industry (current)
+            {"job_title": "Engineer", "is_current": True,
+             "start_date": dt.date(2024, 1, 1), "end_date": None,
+             "company": "Ford", "industry": "Automotive",
+             "company_country_code": "US"},
+            # 8 years in target industry (past)
+            {"job_title": "Scientist", "is_current": False,
+             "start_date": dt.date(2016, 1, 1), "end_date": dt.date(2024, 1, 1),
+             "company": "Pfizer", "industry": "Pharmaceuticals",
+             "company_country_code": "US"},
+        ],
+        "skills": [], "languages": [],
+    }
+    spec = DimensionSpec(values=["Pharmaceuticals"], weight=0.3, required=False)
+    # 8/10 = 0.8 tenure, no current-role floor → 0.8
+    assert 0.75 < score_industry(bundle, spec) < 0.85
+
+
 def test_score_languages_fraction_matched(bundle_pharma_regulatory_uae):
     spec = LanguagesSpec(values=["Arabic", "French"], required_proficiency=None,
                          weight=0.05, required=False)
