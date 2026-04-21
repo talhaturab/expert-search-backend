@@ -52,6 +52,52 @@ Prints `ChatResponse` as formatted JSON to stdout.
 
 ---
 
+## Verified demo queries
+
+Two queries that surface a specific DB candidate as **#1 across RAG, Deterministic, and the Judge's final picks**. Both were run end-to-end against the full 10,120-candidate index with `LLM_MODEL=anthropic/claude-haiku-4.5` (rerank) and `REASONING_MODEL=openai/gpt-5.4-20260305` (parser + judge, `effort=medium`).
+
+### Query 1 — Noor López
+
+```
+VP of Product with 15+ years of experience in IT services based in Turkey
+```
+
+| Expected target | Candidate ID | Current role | Years |
+|---|---|---|---|
+| **Noor López** | `ec6a49ce-cc11-45ac-8604-c52cf115bd00` | VP of Product @ SansarTec (IT Services and IT Consulting) · Sakarya, Turkey | 16y |
+
+**Observed result:** RAG #1 (score 75) · Det #2 (total 76, func 1.00 / geo 1.00 / sr 1.00) · Judge suggested **#1 with `Both` source tag**. Judge quote: *"Noor was the clearest consensus pick."*
+
+### Query 2 — Noah Santos
+
+```
+Lead DevOps engineer based in Paris France with 15+ years of experience
+```
+
+| Expected target | Candidate ID | Current role | Years |
+|---|---|---|---|
+| **Noah Santos** | `ec7c2b0c-a7eb-4d6e-96d7-e8dd9c57b01b` | Lead DevOps Engineer @ American Lighting · Paris, France | 16y |
+
+**Observed result:** RAG #1 · Det #1 (func 1.00 / geo 1.00) · Judge suggested **#1**. All three stages converged on the same candidate.
+
+### How to reproduce
+
+```bash
+# 1. Start the server
+poetry run uvicorn app.main:app --port 8000
+
+# 2. Run either query via the UI at http://localhost:8000/
+#    — or via curl:
+curl -s -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "VP of Product with 15+ years of experience in IT services based in Turkey"}' \
+  | jq '.suggested[0] | {rank, candidate_id, match_explanation}'
+```
+
+The UI shows the full picture: parsed spec + weights, Final picks with `RAG/Det/Both` source tags, side-by-side RAG and Deterministic tables (the Det table renders per-dim ✓/~/✗ pills with numeric scores), Judge reasoning paragraph, and a click-to-open profile drawer with the candidate's full markdown profile.
+
+---
+
 ## Endpoints
 
 | Method | Path | Purpose |
